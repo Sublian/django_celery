@@ -1,0 +1,14 @@
+[project]
+name = "django-fx"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "celery>=5.5.3",
+    "django>=5.2.7",
+    "pandas>=2.3.3",
+    "psycopg2-binary>=2.9.11",
+    "python-decouple>=3.8",
+    "redis>=7.0.1",
+]

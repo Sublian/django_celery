@@ -1,0 +1,60 @@
+# Entorno virtual
+venv/
+.env
+*.env
+
+# Archivos de configuración de entorno
+.env.*
+*.local
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+main.py
+
+# Archivos de base de datos SQLite (solo para desarrollo)
+db.sqlite3
+
+# Archivos de migraciones generadas
+*/migrations/__pycache__/
+*/migrations/*.py
+
+# Archivos estáticos y de medios
+staticfiles/
+media/
+uploads/
+
+# Archivos temporales
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+*.pid
+*.swp
+*.bak
+*.datos
+*.dir
+*.tmp
+*.old
+.DS_Store
+
+# Archivos de Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.iml
+
+# Archivos de prueba / coverage
+.coverage
+htmlcov/
+pytest_cache/
+.tox/
+*.egg-info/
+build/
+dist/
