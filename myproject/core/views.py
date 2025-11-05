@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, HttpResponseBadRequest
-from .models import FileProcess
+from django.utils import timezone
+from .models import FileProcess, TaskRecord
 from .tasks import process_csv_file
 from django import forms
 import os
@@ -35,3 +36,12 @@ def upload_file(request):
     else:
         form = UploadForm()
     return render(request, 'core/upload.html', {'form': form})
+
+def dashboard(request):
+    files = FileProcess.objects.order_by('-created_at')[:50]  # lista de archivos
+    tasks = TaskRecord.objects.order_by('-started_at')[:50]
+    return render(request, 'core/dashboard.html', {
+        'files': files,
+        'tasks': tasks,
+        'now': timezone.now()
+    })
