@@ -36,6 +36,7 @@ uploads/
 *.swp
 *.bak
 *.datos
+*.dat
 *.dir
 *.tmp
 *.old
