@@ -13,12 +13,12 @@
                 </div>
 
                 <div class="card-body p-4">
-                    <form id="uploadForm" enctype="multipart/form-data" class="needs-validation" novalidate>
+                    <form id="upload-form" enctype="multipart/form-data" class="needs-validation" novalidate>
                         {% csrf_token %}
                         <div class="mb-3">
                             <label for="id_name" class="form-label fw-semibold">Nombre descriptivo</label>
                             <input type="text" name="name" class="form-control shadow-sm" id="id_name"
-                                   placeholder="Ejemplo: Reporte mensual ventas" required>
+                                   placeholder="Ejemplo: Correlaciones octubre 2025" required>
                             <div class="invalid-feedback">Por favor, ingresa un nombre descriptivo.</div>
                         </div>
 
@@ -27,8 +27,6 @@
                             <input type="file" name="file" class="form-control shadow-sm" id="id_file" accept=".csv,.xlsx" required>
                             <div class="invalid-feedback">Selecciona un archivo válido (.csv o .xlsx).</div>
                         </div>
-
-                        <div id="uploadStatus" class="text-muted small mb-3"></div>
 
                         <button type="submit" class="btn btn-success w-100 shadow-sm" id="upload-btn">
                             <i class="bi bi-cloud-arrow-up"></i> Subir archivo
@@ -113,19 +111,20 @@
     </div>
   </div>
 </div>
+
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('uploadForm');
+    const form = document.getElementById('upload-form');
     const btn = document.getElementById('upload-btn');
     const successModal = new bootstrap.Modal(document.getElementById('successModal'));
     const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
-    const statusText = document.getElementById("uploadStatus");
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+
         if (!form.checkValidity()) {
             e.stopPropagation();
             form.classList.add('was-validated');
@@ -134,8 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const formData = new FormData(form);
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Subiendo...';
-        statusText.textContent = "⏳ Subiendo archivo...";
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Subiendo...';
 
         try {
             const response = await fetch("{% url 'upload_file' %}", {
@@ -144,32 +142,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: formData
             });
 
-            const data = await response.json().catch(() => ({}));
-
-            if (response.ok && data.status) {
-                if (data.status === "queued" && data.celery_ok && data.redis_ok) {
-                    successModal.show();
-                } else if (data.status === "pending") {
-                    Swal.fire({
-                        icon: "warning",
-                        title: "⚠️ Tarea pendiente",
-                        text: "Celery o Redis no están disponibles. La tarea será reprocesada más tarde.",
-                        timer: 5000,
-                        timerProgressBar: true,
-                        showConfirmButton: false
-                    });
-                } else {
-                    Swal.fire({
-                        icon: "info",
-                        title: "Archivo registrado",
-                        text: "El archivo se subió correctamente.",
-                        timer: 4000,
-                        showConfirmButton: false
-                    });
-                }
+            if (response.ok) {
+                successModal.show();
                 form.reset();
                 form.classList.remove('was-validated');
             } else {
+                const data = await response.json().catch(() => ({}));
                 const msg = data.error || "No se pudo subir el archivo.";
                 document.getElementById('errorMessage').textContent = msg;
                 errorModal.show();
@@ -180,7 +158,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Subir archivo';
-            statusText.textContent = "";
         }
     });
 });

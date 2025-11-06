@@ -1,0 +1,57 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h3>🕓 Tareas pendientes</h3>
+
+  {% if pendientes %}
+    <div class="alert alert-warning d-flex justify-content-between align-items-center">
+      <div>
+        ⚠️ Existen <strong>{{ pendientes|length }}</strong> tareas pendientes.
+        {% if not celery_ok or not redis_ok %}
+          <span class="text-danger ms-2">Celery o Redis inactivos.</span>
+        {% endif %}
+      </div>
+      {% if celery_ok and redis_ok %}
+      <form action="{% url 'reprocesar_pendientes' %}" method="post" class="mb-0">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-primary">
+          🔄 Reprocesar ahora
+        </button>
+      </form>
+      {% endif %}
+    </div>
+
+    <table class="table table-striped align-middle table-hover mt-3">
+      <thead class="table-light">
+        <tr>
+          <th>ID</th>
+          <th>Archivo</th>
+          <th>Tarea</th>
+          <th>Creado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in pendientes %}
+          <tr>
+            <td>{{ p.id }}</td>
+            <td>{{ p.fileprocess.name }}</td>
+            <td>{{ p.task_name }}</td>
+            <td>{{ p.created_at|date:"Y-m-d H:i" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="alert alert-success mt-4">
+      ✅ No hay tareas pendientes por procesar.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+
+<script>
+    setInterval(() => {
+        window.location.reload();
+    }, 10000);
+</script>

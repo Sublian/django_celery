@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 class FileProcess(models.Model):
     STATUS_CHOICES = [
@@ -46,3 +47,17 @@ class TaskRecord(models.Model):
 
     def __str__(self):
         return f"{self.task_name} ({self.status})"
+    
+    
+class PendingTask(models.Model):
+    task_name = models.CharField(max_length=255)
+    args = models.JSONField(default=dict)
+    created_at = models.DateTimeField(default=timezone.now)
+    processed = models.BooleanField(default=False)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.task_name} ({'Procesada' if self.processed else 'Pendiente'})"
+    
+    
+        

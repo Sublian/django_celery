@@ -18,7 +18,7 @@
                         <div class="mb-3">
                             <label for="id_name" class="form-label fw-semibold">Nombre descriptivo</label>
                             <input type="text" name="name" class="form-control shadow-sm" id="id_name"
-                                   placeholder="Ejemplo: Reporte mensual ventas" required>
+                                   placeholder="Ejemplo: Correlaciones octubre 2025" required>
                             <div class="invalid-feedback">Por favor, ingresa un nombre descriptivo.</div>
                         </div>
 
@@ -84,105 +84,88 @@
         </div>
     </div>
 </div>
-
-<!-- ✅ Modal de éxito -->
-<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content text-center p-4">
-      <div class="fs-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
-      <h4 class="fw-bold mb-2">Archivo en cola</h4>
-      <p class="text-muted mb-4">Tu archivo fue agregado a la cola de tareas y se procesará pronto.</p>
-      <div class="d-grid gap-2">
-        <a href="{% url 'dashboard' %}" class="btn btn-success">Ir al panel de control</a>
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Subir otro archivo</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ❌ Modal de error -->
-<div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content text-center p-4">
-      <div class="fs-1 text-danger mb-3"><i class="bi bi-exclamation-triangle-fill"></i></div>
-      <h4 class="fw-bold mb-2">Error al subir</h4>
-      <p class="text-muted mb-4" id="errorMessage">Ocurrió un error al subir el archivo.</p>
-      <div class="d-grid">
-        <button class="btn btn-danger" data-bs-dismiss="modal">Cerrar</button>
-      </div>
-    </div>
-  </div>
-</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('uploadForm');
-    const btn = document.getElementById('upload-btn');
-    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
-    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+document.getElementById("uploadForm").addEventListener("submit", async function(event) {
+    event.preventDefault();
+
+    const form = this;
+    const formData = new FormData(form);
     const statusText = document.getElementById("uploadStatus");
+    const button = document.getElementById("upload-btn");
 
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (!form.checkValidity()) {
-            e.stopPropagation();
-            form.classList.add('was-validated');
-            return;
-        }
+    // Bloquear botón y mostrar estado
+    button.disabled = true;
+    statusText.textContent = "⏳ Subiendo archivo...";
 
-        const formData = new FormData(form);
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Subiendo...';
-        statusText.textContent = "⏳ Subiendo archivo...";
+    try {
+        const response = await fetch("{% url 'upload_file' %}", {
+            method: "POST",
+            body: formData,
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
 
-        try {
-            const response = await fetch("{% url 'upload_file' %}", {
-                method: "POST",
-                headers: { "X-Requested-With": "XMLHttpRequest" },
-                body: formData
+        const result = await response.json();
+        console.log(result);
+
+        if (response.ok) {
+            let title = "";
+            let message = "";
+            let icon = "";
+
+            if (result.status === "queued" && result.celery_ok && result.redis_ok) {
+                title = "✅ ¡Archivo encolado!";
+                message = "El archivo fue agregado correctamente a la cola de tareas.";
+                icon = "success";
+            } 
+            else if (result.status === "pending") {
+                title = "⚠️ Tarea pendiente";
+                message = "Celery o Redis no están disponibles. La tarea será procesada automáticamente más tarde.";
+                icon = "warning";
+            } 
+            else {
+                title = "ℹ️ Archivo registrado";
+                message = "El archivo se subió correctamente.";
+                icon = "info";
+            }
+
+            await Swal.fire({
+                title: title,
+                text: message,
+                icon: icon,
+                timer: 5000,
+                timerProgressBar: true,
+                showConfirmButton: false
             });
 
-            const data = await response.json().catch(() => ({}));
-
-            if (response.ok && data.status) {
-                if (data.status === "queued" && data.celery_ok && data.redis_ok) {
-                    successModal.show();
-                } else if (data.status === "pending") {
-                    Swal.fire({
-                        icon: "warning",
-                        title: "⚠️ Tarea pendiente",
-                        text: "Celery o Redis no están disponibles. La tarea será reprocesada más tarde.",
-                        timer: 5000,
-                        timerProgressBar: true,
-                        showConfirmButton: false
-                    });
-                } else {
-                    Swal.fire({
-                        icon: "info",
-                        title: "Archivo registrado",
-                        text: "El archivo se subió correctamente.",
-                        timer: 4000,
-                        showConfirmButton: false
-                    });
-                }
-                form.reset();
-                form.classList.remove('was-validated');
-            } else {
-                const msg = data.error || "No se pudo subir el archivo.";
-                document.getElementById('errorMessage').textContent = msg;
-                errorModal.show();
-            }
-        } catch (err) {
-            document.getElementById('errorMessage').textContent = "Error de conexión con el servidor.";
-            errorModal.show();
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Subir archivo';
-            statusText.textContent = "";
+            window.location.href = "{% url 'dashboard' %}";
+        } 
+        else {
+            const errMsg = result.error || "Error desconocido al procesar el archivo.";
+            Swal.fire({
+                title: "❌ Error",
+                text: errMsg,
+                icon: "error",
+                confirmButtonText: "Entendido"
+            });
         }
-    });
+
+    } catch (error) {
+        console.error("Error en la subida:", error);
+        Swal.fire({
+            title: "❌ Error de conexión",
+            text: "No se pudo contactar con el servidor. Verifica tu conexión o intenta nuevamente.",
+            icon: "error",
+            confirmButtonText: "Aceptar"
+        });
+    } finally {
+        // Restaurar botón y limpiar estado
+        button.disabled = false;
+        statusText.textContent = "";
+        form.reset();
+    }
 });
 </script>
 {% endblock %}

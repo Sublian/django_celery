@@ -121,6 +121,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'core.tasks.send_welcome_email',
         'schedule': timedelta(seconds=5),
     },
+    'reprocess_pending': {
+        'task': 'core.tasks.reprocess_pending_tasks',
+        # 'schedule': timedelta(minutes=1),
+        'schedule': timedelta(seconds=30),
+    },
 }
 
 CELERY_BEAT_SCHEDULE_FILENAME = BASE_DIR / 'celery-data' / 'celerybeat-schedule'
