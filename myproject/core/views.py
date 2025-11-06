@@ -6,10 +6,13 @@ from django.utils import timezone
 from .models import FileProcess, TaskRecord
 from .tasks import process_csv_file
 from django import forms
-import os
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from .models import FileProcess
+import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 class UploadForm(forms.ModelForm):
     class Meta:
@@ -18,6 +21,7 @@ class UploadForm(forms.ModelForm):
 
 def upload_file(request):
     if request.method == 'POST':
+        logger.info("Usuario %s subió un archivo desde %s", request.user, request.META.get('REMOTE_ADDR'))
         name = request.POST.get('name')
         file = request.FILES.get('file')
 
@@ -71,3 +75,4 @@ def dashboard(request):
         'per_page': per_page,
     }
     return render(request, 'core/dashboard.html', context)
+

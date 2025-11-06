@@ -6,7 +6,9 @@ from .models import FileProcess, TaskRecord
 from django.utils import timezone
 import pandas as pd
 import os
+import logging
 
+logger = logging.getLogger(__name__)
 
 @shared_task
 def send_welcome_email():
@@ -28,6 +30,7 @@ def print_heartbeat():
     
 @shared_task(bind=True)
 def process_csv_file(self, file_id):
+    
     """Procesa CSV/XLSX, crea un TaskRecord vinculado al FileProcess y actualiza ambos modelos."""
     obj = FileProcess.objects.get(id=file_id)
     
@@ -45,6 +48,7 @@ def process_csv_file(self, file_id):
         
         file_path = obj.file.path
         ext = os.path.splitext(file_path)[1].lower()
+        logger.info(f"📂 Iniciando procesamiento de {obj.name}")
         print(f"📂 Procesando archivo: {file_path}")
 
         # Leer el archivo dependiendo de la extensión
@@ -72,6 +76,7 @@ def process_csv_file(self, file_id):
         obj.processed = True
         obj.message = f'Procesamiento completado: {total_rows} filas'
         obj.save(update_fields=['status', 'processed', 'message'])
+        logger.info(f"✅ Archivo {obj.name} procesado correctamente.")
 
         # Puedes agregar lógica de procesamiento aquí (por ejemplo guardar resultados)
         return {"status": "ok", "rows": total_rows}
@@ -79,6 +84,7 @@ def process_csv_file(self, file_id):
     except Exception as e:
         # Guardar error en TaskRecord y FileProcess
         print(f"❌ Error procesando archivo: {e}")
+        logger.error(f"❌ Error procesando archivo {file_id}: {e}", exc_info=True)
         record.status = 'FAILURE'
         record.result = str(e)
         record.finished_at = timezone.now()
