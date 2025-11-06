@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from django.core.paginator import Paginator
+from django.conf import settings
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest
 from django.utils import timezone
@@ -75,4 +76,35 @@ def dashboard(request):
         'per_page': per_page,
     }
     return render(request, 'core/dashboard.html', context)
+
+
+def view_logs(request):
+    """
+    Vista para mostrar el contenido del archivo de logs y permitir recarga dinámica.
+    """
+    log_path = os.path.join(settings.BASE_DIR, "logs", "django_app.log")
+
+    if not os.path.exists(log_path):
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"lines": []})
+        return HttpResponse("⚠️ No hay registros disponibles.", content_type="text/plain")
+
+    with open(log_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    lines.reverse()  # Mostrar los más recientes primero
+    paginator = Paginator(lines, 50)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    # ⚡ Respuesta dinámica para fetch()
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({
+            "lines": page_obj.object_list,
+            "page": page_obj.number,
+            "has_next": page_obj.has_next(),
+            "has_previous": page_obj.has_previous(),
+        })
+
+    return render(request, "core/logs.html", {"page_obj": page_obj})
 

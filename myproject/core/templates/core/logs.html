@@ -1,0 +1,59 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% block content %}
+<div class="container mt-4">
+    <h2>🧾 Monitor de registros</h2>
+    <p class="text-muted">Los registros se actualizan automáticamente cada 10 segundos.</p>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body" id="log-container"
+             style="background-color:#0d1117; color:#c9d1d9; font-family: monospace; height: 500px; overflow-y: auto;">
+            {% for line in page_obj %}
+                <div class="{% if 'ERROR' in line %}text-danger{% elif 'WARNING' in line %}text-warning{% elif 'INFO' in line %}text-success{% endif %}">
+                    {{ line|escape }}
+                </div>
+            {% empty %}
+                <p class="text-muted">No hay registros en este momento.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Botón manual -->
+    <div class="text-center mt-3">
+        <button class="btn btn-outline" onclick="fetchLogs()">🔄 Actualizar ahora</button>
+    </div>
+</div>
+
+<script>
+const logContainer = document.getElementById("log-container");
+
+async function fetchLogs() {
+    try {
+        const response = await fetch("{% url 'view_logs' %}", {
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        const data = await response.json();
+
+        if (data.lines) {
+            logContainer.innerHTML = "";
+            data.lines.forEach(line => {
+                let colorClass = "";
+                if (line.includes("ERROR")) colorClass = "text-danger";
+                else if (line.includes("WARNING")) colorClass = "text-warning";
+                else if (line.includes("INFO")) colorClass = "text-success";
+
+                const div = document.createElement("div");
+                div.className = colorClass;
+                div.textContent = line;
+                logContainer.appendChild(div);
+            });
+        }
+    } catch (err) {
+        console.error("Error al actualizar logs:", err);
+    }
+}
+
+// Actualizar cada 10 segundos
+setInterval(fetchLogs, 10000);
+</script>
+{% endblock %}
