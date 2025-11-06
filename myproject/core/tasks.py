@@ -37,7 +37,7 @@ def process_csv_file(self, file_id):
         task_id=(getattr(self.request, 'id', None)),
         task_name='process_csv_file',
         status='STARTED',
-        started_at=timezone.now()
+        created_at=timezone.now()
     )
     try:
         obj.status = 'processing'

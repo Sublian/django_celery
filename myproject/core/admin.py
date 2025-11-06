@@ -7,5 +7,5 @@ class FileProcessAdmin(admin.ModelAdmin):
 
 @admin.register(TaskRecord)
 class TaskRecordAdmin(admin.ModelAdmin):
-    list_display = ('task_id','task_name','status','fileprocess','started_at','finished_at')
+    list_display = ('task_id','task_name','status','fileprocess','created_at','finished_at')
     list_filter = ('status','task_name')

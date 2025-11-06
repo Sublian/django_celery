@@ -37,12 +37,12 @@ class TaskRecord(models.Model):
     task_name = models.CharField(max_length=100)
     status = models.CharField(max_length=20, choices=TASK_STATUS, default='PENDING')
     result = models.TextField(null=True, blank=True)                    # mensaje/resultados
-    started_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     finished_at = models.DateTimeField(null=True, blank=True)
     
     # Nota: related_name='task_records' te permite acceder a fileprocess.task_records.all()
     class Meta:
-        ordering = ['-started_at']
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"{self.task_name} ({self.status})"
