@@ -6,48 +6,38 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
 
-            <!-- 📦 Tarjeta de carga -->
+            <!-- 📦 Tarjeta principal -->
             <div class="card shadow-lg border-0 rounded-4">
                 <div class="card-header bg-success text-white text-center rounded-top-4">
                     <h4 class="mb-0"><i class="bi bi-cloud-upload"></i> Subir nuevo archivo</h4>
                 </div>
-                <div class="card-body">
-                    
-                    <!-- 📨 Mensajes del sistema -->
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
 
-                    <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                <div class="card-body p-4">
+                    <form id="upload-form" enctype="multipart/form-data" class="needs-validation" novalidate>
                         {% csrf_token %}
                         <div class="mb-3">
-                            <label for="id_name" class="form-label">Nombre descriptivo</label>
+                            <label for="id_name" class="form-label fw-semibold">Nombre descriptivo</label>
                             <input type="text" name="name" class="form-control shadow-sm" id="id_name"
                                    placeholder="Ejemplo: Correlaciones octubre 2025" required>
                             <div class="invalid-feedback">Por favor, ingresa un nombre descriptivo.</div>
                         </div>
 
                         <div class="mb-3">
-                            <label for="id_file" class="form-label">Archivo (.csv o .xlsx)</label>
-                            <input type="file" name="file" class="form-control shadow-sm" id="id_file" accept=".csv, .xlsx" required>
+                            <label for="id_file" class="form-label fw-semibold">Archivo (.csv o .xlsx)</label>
+                            <input type="file" name="file" class="form-control shadow-sm" id="id_file" accept=".csv,.xlsx" required>
                             <div class="invalid-feedback">Selecciona un archivo válido (.csv o .xlsx).</div>
                         </div>
 
-                        <button type="submit" class="btn btn-success w-100 shadow-sm">
+                        <button type="submit" class="btn btn-success w-100 shadow-sm" id="upload-btn">
                             <i class="bi bi-cloud-arrow-up"></i> Subir archivo
                         </button>
                     </form>
                 </div>
             </div>
 
-            <!-- 🗂️ Archivos recientes -->
+            <!-- 🗂️ Últimos archivos -->
             {% if recent_files %}
-            <div class="card shadow-sm border-0">
+            <div class="card shadow-sm border-0 mt-4">
                 <div class="card-header bg-light fw-bold">
                     <i class="bi bi-clock-history"></i> Últimos archivos subidos
                 </div>
@@ -65,8 +55,8 @@
                         <tbody>
                             {% for f in recent_files %}
                             <tr>
-                                <td>{{ f.name }}</td>
-                                <td>{{ f.file.name|cut:"uploads/" }}</td>
+                                <td class="fw-semibold">{{ f.name }}</td>
+                                <td class="text-muted">{{ f.file.name|cut:"uploads/" }}</td>
                                 <td>
                                     {% if f.status == 'done' %}
                                         <span class="badge bg-success">Completado</span>
@@ -78,14 +68,8 @@
                                         <span class="badge bg-secondary">Pendiente</span>
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {% if f.processed %}
-                                        ✅
-                                    {% else %}
-                                        ⏳
-                                    {% endif %}
-                                </td>
-                                <td class="text-nowrap">{{ f.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>{% if f.processed %}✅{% else %}⏳{% endif %}</td>
+                                <td class="text-nowrap text-muted small">{{ f.created_at|date:"Y-m-d H:i" }}</td>
                             </tr>
                             {% empty %}
                             <tr><td colspan="5" class="text-center text-muted">No hay archivos recientes</td></tr>
@@ -99,20 +83,83 @@
     </div>
 </div>
 
-<!-- ⚙️ Validación Bootstrap -->
+<!-- ✅ Modal de éxito -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center p-4">
+      <div class="fs-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
+      <h4 class="fw-bold mb-2">Archivo en cola</h4>
+      <p class="text-muted mb-4">Tu archivo fue agregado a la cola de tareas y se procesará pronto.</p>
+      <div class="d-grid gap-2">
+        <a href="{% url 'dashboard' %}" class="btn btn-success">Ir al panel de control</a>
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Subir otro archivo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ❌ Modal de error -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center p-4">
+      <div class="fs-1 text-danger mb-3"><i class="bi bi-exclamation-triangle-fill"></i></div>
+      <h4 class="fw-bold mb-2">Error al subir</h4>
+      <p class="text-muted mb-4" id="errorMessage">Ocurrió un error al subir el archivo.</p>
+      <div class="d-grid">
+        <button class="btn btn-danger" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
-(() => {
-  'use strict'
-  const forms = document.querySelectorAll('.needs-validation')
-  Array.from(forms).forEach(form => {
-    form.addEventListener('submit', event => {
-      if (!form.checkValidity()) {
-        event.preventDefault()
-        event.stopPropagation()
-      }
-      form.classList.add('was-validated')
-    }, false)
-  })
-})()
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('upload-form');
+    const btn = document.getElementById('upload-btn');
+    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        if (!form.checkValidity()) {
+            e.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
+
+        const formData = new FormData(form);
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Subiendo...';
+
+        try {
+            const response = await fetch("{% url 'upload_file' %}", {
+                method: "POST",
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                body: formData
+            });
+
+            if (response.ok) {
+                successModal.show();
+                form.reset();
+                form.classList.remove('was-validated');
+            } else {
+                const data = await response.json().catch(() => ({}));
+                const msg = data.error || "No se pudo subir el archivo.";
+                document.getElementById('errorMessage').textContent = msg;
+                errorModal.show();
+            }
+        } catch (err) {
+            document.getElementById('errorMessage').textContent = "Error de conexión con el servidor.";
+            errorModal.show();
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Subir archivo';
+        }
+    });
+});
 </script>
 {% endblock %}
