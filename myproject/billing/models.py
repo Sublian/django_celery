@@ -1,6 +1,8 @@
 # billing\models.py
 from django.db import models
 from django.utils import timezone
+from django.conf import settings    # ← Importa la configuración global de Django
+
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
@@ -16,7 +18,6 @@ class Partner(TimeStampedModel):
     email_secondary = models.EmailField(blank=True, null=True, verbose_name="Correo Electrónico Secundario")
     vat = models.CharField(max_length=11, unique=True, verbose_name="RUC o DNI")
     num_document = models.CharField(max_length=20, unique=True, blank=True, null=True, verbose_name="Número de Documento")
-    parent_id = models.ForeignKey('self', on_delete=models.PROTECT, null=True, blank=True, verbose_name="Empresa Relacionada", related_name="children")
     ref = models.CharField(max_length=64, unique=True, blank=True, null=True, verbose_name="Referencia Interna")
     website = models.URLField(blank=True, null=True, verbose_name="Sitio Web")
     comment = models.TextField(blank=True, null=True, verbose_name="Notas Adicionales")
@@ -39,10 +40,31 @@ class Partner(TimeStampedModel):
     sunat_condition = models.CharField(max_length=3, blank=True, null=True, verbose_name="Condición SUNAT")
     partner_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True, verbose_name="Latitud")
     partner_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True, verbose_name="Longitud")    
-    # user = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Usuario Asociado")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Usuario Asociado", related_name='partners')
+    parent= models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Empresa Relacionada", related_name="children")
     def __str__(self): return self.name
 
 # Company, Product, Tax...
+class Currency(models.Model):
+    name = models.CharField(max_length=3, unique=True, verbose_name="Código de Moneda")
+    symbol = models.CharField(max_length=5, verbose_name="Símbolo de Moneda")
+    decimal_places = models.IntegerField(default=2, verbose_name="Decimales de Redondeo")
+    active = models.BooleanField(default=True, verbose_name="Activo")
+    pse_code = models.CharField(max_length=3, verbose_name="Código PSE")
+    singular_name = models.CharField(max_length=64, verbose_name="Nombre Singular")
+    plural_name = models.CharField(max_length=64, verbose_name="Nombre Plural")
+    fraction_name = models.CharField(max_length=64, verbose_name="Nombre de la Fracción")
+    def __str__(self): return self.name
+
+class CurrencyRate(models.Model):
+    currency = models.ForeignKey(Currency, on_delete=models.PROTECT, verbose_name="Moneda")
+    rate = models.DecimalField(max_digits=18, decimal_places=6, verbose_name="Tasa de Cambio")
+    date_rate = models.DateField(default=timezone.now, verbose_name="Fecha de la Tasa")
+    company = models.ForeignKey('Company', on_delete=models.PROTECT, verbose_name="Compañía")
+    purchase_rate = models.DecimalField(max_digits=18, decimal_places=6, verbose_name="Tasa de Compra", default=0)
+    sale_rate = models.DecimalField(max_digits=18, decimal_places=6, verbose_name="Tasa de Venta", default=0)
+    def __str__(self): return f"{self.currency.name} - {self.rate} on {self.date_rate}"
+    
 class Company(models.Model):
     name = models.CharField(max_length=255, verbose_name="Razón Social o Nombre Comercial")
     vat = models.CharField(max_length=11, unique=True, verbose_name="RUC")
