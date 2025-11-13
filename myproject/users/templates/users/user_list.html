@@ -1,0 +1,38 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Usuarios</h2>
+  <a href="{% url 'user_create' %}" class="btn btn-success mb-3">➕ Nuevo Usuario</a>
+
+  {% if users %}
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>ID</th><th>Usuario</th><th>Email</th><th>Teléfono</th><th>Activo</th><th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr>
+        <td>{{ user.id }}</td>
+        <td>{{ user.username }}</td>
+        <td>{{ user.email }}</td>
+        <td>{{ user.phone|default:"—" }}</td>
+        <td>{% if user.is_active %}✅{% else %}❌{% endif %}</td>
+        <td>
+          <a href="{% url 'user_edit' user.id %}" class="btn btn-primary btn-sm">Editar</a>
+          {% if user.is_active %}
+            <a href="{% url 'user_deactivate' user.id %}" class="btn btn-warning btn-sm">Desactivar</a>
+          {% else %}
+            <a href="{% url 'user_activate' user.id %}" class="btn btn-success btn-sm">Activar</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No hay usuarios registrados.</p>
+  {% endif %}
+</div>
+{% endblock %}

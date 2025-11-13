@@ -30,15 +30,18 @@ ALLOWED_HOSTS = []
 
 
 # Application definition
+AUTH_USER_MODEL = 'users.User'
 
 INSTALLED_APPS = [
+    'users',
+    'core',
+    'billing',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'core',
 ]
 
 MIDDLEWARE = [
@@ -60,6 +63,7 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -123,8 +127,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     'reprocess_pending': {
         'task': 'core.tasks.reprocess_pending_tasks',
-        # 'schedule': timedelta(minutes=1),
-        'schedule': timedelta(seconds=30),
+        'schedule': timedelta(minutes=5),
     },
 }
 

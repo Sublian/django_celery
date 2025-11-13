@@ -5,7 +5,6 @@
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-8">
-
             <!-- 📦 Tarjeta principal -->
             <div class="card shadow-lg border-0 rounded-4">
                 <div class="card-header bg-success text-white text-center rounded-top-4">
@@ -15,20 +14,42 @@
                 <div class="card-body p-4">
                     <form id="uploadForm" enctype="multipart/form-data" class="needs-validation" novalidate>
                         {% csrf_token %}
+                        
+                        <!-- Progress bar -->
+                        <div class="progress mb-3 d-none" id="uploadProgress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+
                         <div class="mb-3">
                             <label for="id_name" class="form-label fw-semibold">Nombre descriptivo</label>
-                            <input type="text" name="name" class="form-control shadow-sm" id="id_name"
-                                   placeholder="Ejemplo: Reporte mensual ventas" required>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-tag"></i></span>
+                                <input type="text" name="name" class="form-control shadow-sm" id="id_name"
+                                       placeholder="Ejemplo: Reporte mensual ventas" required>
+                            </div>
                             <div class="invalid-feedback">Por favor, ingresa un nombre descriptivo.</div>
                         </div>
 
                         <div class="mb-3">
                             <label for="id_file" class="form-label fw-semibold">Archivo (.csv o .xlsx)</label>
-                            <input type="file" name="file" class="form-control shadow-sm" id="id_file" accept=".csv,.xlsx" required>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-file-earmark-text"></i></span>
+                                <input type="file" name="file" class="form-control shadow-sm" id="id_file" 
+                                       accept=".csv,.xlsx" required>
+                            </div>
                             <div class="invalid-feedback">Selecciona un archivo válido (.csv o .xlsx).</div>
+                            <div class="form-text" id="fileHelp">
+                                Tamaño máximo: 10MB. Formatos soportados: CSV, Excel
+                            </div>
                         </div>
 
-                        <div id="uploadStatus" class="text-muted small mb-3"></div>
+                        <div id="uploadStatus" class="alert alert-info d-none">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                <div>Procesando archivo...</div>
+                            </div>
+                        </div>
 
                         <button type="submit" class="btn btn-success w-100 shadow-sm" id="upload-btn">
                             <i class="bi bi-cloud-arrow-up"></i> Subir archivo
@@ -40,78 +61,68 @@
             <!-- 🗂️ Últimos archivos -->
             {% if recent_files %}
             <div class="card shadow-sm border-0 mt-4">
-                <div class="card-header bg-light fw-bold">
-                    <i class="bi bi-clock-history"></i> Últimos archivos subidos
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold"><i class="bi bi-clock-history"></i> Últimos archivos</span>
+                        <span class="badge bg-secondary">{{ recent_files|length }}</span>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Nombre</th>
-                                <th>Archivo</th>
-                                <th>Estado</th>
-                                <th>Procesado</th>
-                                <th>Fecha</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for f in recent_files %}
-                            <tr>
-                                <td class="fw-semibold">{{ f.name }}</td>
-                                <td class="text-muted">{{ f.file.name|cut:"uploads/" }}</td>
-                                <td>
-                                    {% if f.status == 'done' %}
-                                        <span class="badge bg-success">Completado</span>
-                                    {% elif f.status == 'error' %}
-                                        <span class="badge bg-danger">Error</span>
-                                    {% elif f.status == 'processing' %}
-                                        <span class="badge bg-warning text-dark">Procesando</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">Pendiente</span>
-                                    {% endif %}
-                                </td>
-                                <td>{% if f.processed %}✅{% else %}⏳{% endif %}</td>
-                                <td class="text-nowrap text-muted small">{{ f.created_at|date:"Y-m-d H:i" }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr><td colspan="5" class="text-center text-muted">No hay archivos recientes</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Archivo</th>
+                                    <th>Estado</th>
+                                    <th>Procesado</th>
+                                    <th>Fecha</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for f in recent_files %}
+                                <tr>
+                                    <td class="fw-semibold text-truncate" style="max-width: 200px;">
+                                        {{ f.name }}
+                                    </td>
+                                    <td class="text-muted">{{ f.file.name|cut:"uploads/" }}</td>
+                                    <td>
+                                        {% if f.status == 'done' %}
+                                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Completado</span>
+                                        {% elif f.status == 'error' %}
+                                            <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Error</span>
+                                        {% elif f.status == 'processing' %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="bi bi-gear-fill me-1"></i>Procesando
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                <i class="bi bi-hourglass me-1"></i>Pendiente
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{% if f.processed %}✅{% else %}⏳{% endif %}</td>
+                                    <td class="text-nowrap text-muted small">
+                                        <i class="bi bi-calendar-event me-1"></i>
+                                        {{ f.created_at|date:"Y-m-d H:i" }}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                        No hay archivos recientes
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             {% endif %}
         </div>
     </div>
-</div>
-
-<!-- ✅ Modal de éxito -->
-<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content text-center p-4">
-      <div class="fs-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
-      <h4 class="fw-bold mb-2">Archivo en cola</h4>
-      <p class="text-muted mb-4">Tu archivo fue agregado a la cola de tareas y se procesará pronto.</p>
-      <div class="d-grid gap-2">
-        <a href="{% url 'dashboard' %}" class="btn btn-success">Ir al panel de control</a>
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Subir otro archivo</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ❌ Modal de error -->
-<div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content text-center p-4">
-      <div class="fs-1 text-danger mb-3"><i class="bi bi-exclamation-triangle-fill"></i></div>
-      <h4 class="fw-bold mb-2">Error al subir</h4>
-      <p class="text-muted mb-4" id="errorMessage">Ocurrió un error al subir el archivo.</p>
-      <div class="d-grid">
-        <button class="btn btn-danger" data-bs-dismiss="modal">Cerrar</button>
-      </div>
-    </div>
-  </div>
 </div>
 {% endblock %}
 
@@ -120,12 +131,29 @@
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('uploadForm');
     const btn = document.getElementById('upload-btn');
-    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
-    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
-    const statusText = document.getElementById("uploadStatus");
+    const statusDiv = document.getElementById('uploadStatus');
+    const progressBar = document.getElementById('uploadProgress');
+    const progressBarInner = progressBar.querySelector('.progress-bar');
+
+    const updateProgress = (percent) => {
+        progressBar.classList.remove('d-none');
+        progressBarInner.style.width = `${percent}%`;
+        progressBarInner.setAttribute('aria-valuenow', percent);
+    };
+
+    const resetForm = () => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Subir archivo';
+        statusDiv.classList.add('d-none');
+        progressBar.classList.add('d-none');
+        progressBarInner.style.width = '0%';
+        form.reset();
+        form.classList.remove('was-validated');
+    };
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+
         if (!form.checkValidity()) {
             e.stopPropagation();
             form.classList.add('was-validated');
@@ -134,53 +162,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const formData = new FormData(form);
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Subiendo...';
-        statusText.textContent = "⏳ Subiendo archivo...";
-
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+        statusDiv.classList.remove('d-none');
+        
         try {
+            updateProgress(25);
+            
             const response = await fetch("{% url 'upload_file' %}", {
                 method: "POST",
                 headers: { "X-Requested-With": "XMLHttpRequest" },
                 body: formData
             });
 
-            const data = await response.json().catch(() => ({}));
+            updateProgress(75);
+            const result = await response.json();
 
-            if (response.ok && data.status) {
-                if (data.status === "queued" && data.celery_ok && data.redis_ok) {
-                    successModal.show();
-                } else if (data.status === "pending") {
-                    Swal.fire({
-                        icon: "warning",
-                        title: "⚠️ Tarea pendiente",
-                        text: "Celery o Redis no están disponibles. La tarea será reprocesada más tarde.",
-                        timer: 5000,
+            if (response.ok) {
+                updateProgress(100);
+                
+                if (result.status === "queued" && result.celery_ok && result.redis_ok) {
+                    await Swal.fire({
+                        icon: 'success',
+                        title: '¡Archivo encolado!',
+                        text: 'El archivo fue agregado correctamente a la cola de tareas.',
+                        timer: 3000,
                         timerProgressBar: true,
                         showConfirmButton: false
                     });
+                    window.location.href = "{% url 'dashboard' %}";
                 } else {
-                    Swal.fire({
-                        icon: "info",
-                        title: "Archivo registrado",
-                        text: "El archivo se subió correctamente.",
+                    const icon = result.status === "pending" ? 'warning' : 'info';
+                    const title = result.status === "pending" ? 'Tarea pendiente' : 'Archivo registrado';
+                    const text = result.status === "pending" 
+                        ? 'Los servicios no están disponibles. La tarea será procesada más tarde.'
+                        : 'El archivo se subió correctamente.';
+                    
+                    await Swal.fire({
+                        icon, title, text,
                         timer: 4000,
+                        timerProgressBar: true,
                         showConfirmButton: false
                     });
                 }
-                form.reset();
-                form.classList.remove('was-validated');
             } else {
-                const msg = data.error || "No se pudo subir el archivo.";
-                document.getElementById('errorMessage').textContent = msg;
-                errorModal.show();
+                throw new Error(result.error || "Error al procesar el archivo");
             }
-        } catch (err) {
-            document.getElementById('errorMessage').textContent = "Error de conexión con el servidor.";
-            errorModal.show();
+        } catch (error) {
+            console.error("Error:", error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message || 'Error de conexión con el servidor',
+                confirmButtonText: 'Entendido'
+            });
         } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Subir archivo';
-            statusText.textContent = "";
+            resetForm();
         }
     });
 });
