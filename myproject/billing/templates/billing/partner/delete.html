@@ -8,6 +8,6 @@
 <form method="post">
     {% csrf_token %}
     <button class="btn btn-danger">Desactivar</button>
-    <a href="{% url 'partner_list' %}" class="btn btn-secondary">Cancelar</a>
+    <a href="{% url 'billing:partner_list' %}" class="btn btn-secondary">Cancelar</a>
 </form>
 {% endblock %}

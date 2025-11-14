@@ -84,6 +84,7 @@ class Company(models.Model):
     report_footer = models.TextField(blank=True, null=True, verbose_name="Pie de Página de Reportes")
     logo_web = models.ImageField(upload_to="company/logos/", blank=True, null=True, verbose_name="Logo para Web")
     email = models.EmailField(blank=True, null=True, verbose_name="Correo Electrónico")
+    active = models.BooleanField(default=True, verbose_name="Activo")
     def __str__(self): return self.name
 
 class Product(models.Model):

@@ -1,0 +1,26 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container mt-4">
+
+    <h2>🏢 {{ company.name }}</h2>
+
+    <p><strong>RUC:</strong> {{ company.tax_id }}</p>
+    <p><strong>Dirección:</strong> {{ company.address }}</p>
+    <p><strong>Día de Facturación:</strong> {{ company.billing_day }}</p>
+
+    <p>
+        <strong>Estado:</strong>
+        {% if company.active %}
+            <span class="badge bg-success">Activa</span>
+        {% else %}
+            <span class="badge bg-danger">Inactiva</span>
+        {% endif %}
+    </p>
+
+    <hr>
+
+    <a href="{% url 'company_edit' company.id %}" class="btn btn-primary">Editar</a>
+    <a href="{% url 'company_list' %}" class="btn btn-secondary">Volver</a>
+
+</div>
+{% endblock %}

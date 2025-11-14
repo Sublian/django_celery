@@ -27,9 +27,8 @@
         </ul>
 
         <hr>
-        <a href="#" class="btn btn-warning">Editar</a>
-        <!-- url 'partner_edit' partner.id  -->
-        <a href="{% url 'partner_list' %}" class="btn btn-secondary">Volver</a>
+        <a href="{% url 'billing:partner_update' partner.id %}" class="btn btn-warning">Editar</a>
+        <a href="{% url 'billing:partner_list' %}" class="btn btn-secondary">Volver</a>
 
     </div>
 </div>

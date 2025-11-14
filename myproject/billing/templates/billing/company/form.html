@@ -1,0 +1,26 @@
+{% extends "core/base.html" %}
+{% block content %}
+
+<h2 class="mb-4">
+    {% if mode == "create" %}➕ Nueva Compañía{% else %}✏️ Editar Compañía{% endif %}
+</h2>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="card p-4 shadow-sm">
+        {% for field in form %}
+        <div class="mb-3">
+            <label class="form-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+                <div class="text-danger small">{{ field.errors }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <button class="btn btn-primary">Guardar</button>
+        <a href="{% url 'billing:company_list' %}" class="btn btn-secondary">Cancelar</a>
+    </div>
+</form>
+
+{% endblock %}
