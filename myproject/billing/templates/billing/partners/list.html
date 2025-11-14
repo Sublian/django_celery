@@ -1,0 +1,35 @@
+{% extends "billing/base_billing.html" %}
+
+{% block billing_content %}
+<h2>Partners</h2>
+
+<a href="{% url 'partner_create' %}" class="btn btn-primary mb-3">Nuevo Partner</a>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Documento</th>
+            <th>Email</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for p in partners %}
+        <tr>
+            <td>{{ p.display_name }}</td>
+            <td>{{ p.vat }}</td>
+            <td>{{ p.email }}</td>
+            <td>{{ p.is_active|yesno:"Activo,Inactivo" }}</td>
+            <td>
+                <a href="{% url 'partner_detail' p.pk %}" class="btn btn-sm btn-info">Ver</a>
+                <a href="{% url 'partner_update' p.pk %}" class="btn btn-sm btn-warning">Editar</a>
+                <a href="{% url 'partner_delete' p.pk %}" class="btn btn-sm btn-danger">Desactivar</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

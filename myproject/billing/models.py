@@ -16,7 +16,16 @@ class Partner(TimeStampedModel):
     display_name = models.CharField(max_length=255, verbose_name="Nombre para Mostrar")
     email = models.EmailField(blank=True, null=True, verbose_name="Correo Electrónico")
     email_secondary = models.EmailField(blank=True, null=True, verbose_name="Correo Electrónico Secundario")
-    vat = models.CharField(max_length=11, unique=True, verbose_name="RUC o DNI")
+    document_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("dni", "DNI"),
+            ("ruc", "RUC"),
+            ("ce", "Carnet Extranjería"),
+            ("passport", "Pasaporte"),
+        ],
+        default="dni"
+    )
     num_document = models.CharField(max_length=20, unique=True, blank=True, null=True, verbose_name="Número de Documento")
     ref = models.CharField(max_length=64, unique=True, blank=True, null=True, verbose_name="Referencia Interna")
     website = models.URLField(blank=True, null=True, verbose_name="Sitio Web")
@@ -40,8 +49,9 @@ class Partner(TimeStampedModel):
     sunat_condition = models.CharField(max_length=3, blank=True, null=True, verbose_name="Condición SUNAT")
     partner_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True, verbose_name="Latitud")
     partner_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True, verbose_name="Longitud")    
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Usuario Asociado", related_name='partners')
     parent= models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Empresa Relacionada", related_name="children")
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Usuario Asociado", related_name='partner_profile')
+    companies = models.ManyToManyField('Company', blank=True, related_name='partners', verbose_name="Compañías Asociadas")
     def __str__(self): return self.name
 
 # Company, Product, Tax...

@@ -1,0 +1,13 @@
+{% extends "billing/base_billing.html" %}
+
+{% block billing_content %}
+<h2>{{ view.object.pk|yesno:"Editar Partner,Nuevo Partner" }}</h2>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+
+    <button class="btn btn-success" type="submit">Guardar</button>
+    <a class="btn btn-secondary" href="{% url 'partner_list' %}">Cancelar</a>
+</form>
+{% endblock %}

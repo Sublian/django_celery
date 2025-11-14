@@ -1,0 +1,13 @@
+{% extends "billing/base_billing.html" %}
+
+{% block billing_content %}
+<h3>¿Seguro que deseas desactivar este Partner?</h3>
+
+<p>{{ object.display_name }}</p>
+
+<form method="post">
+    {% csrf_token %}
+    <button class="btn btn-danger">Desactivar</button>
+    <a href="{% url 'partner_list' %}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Detalle de Partner{% endblock %}
+
+{% block content %}
+<div class="card shadow">
+    <div class="card-header bg-primary text-white">
+        <h4>Detalle del Partner</h4>
+    </div>
+    <div class="card-body">
+
+        <p><strong>Nombre:</strong> {{ partner.display_name }}</p>
+        <p><strong>Email:</strong> {{ partner.email }}</p>
+        <p><strong>Teléfono:</strong> {{ partner.phone }}</p>
+
+        <p><strong>¿Es compañía?</strong> 
+            {{ partner.is_company|yesno:"Sí,No" }}
+        </p>
+
+        <p><strong>Compañías asociadas:</strong></p>
+        <ul>
+            {% for c in partner.companies.all %}
+                <li>{{ c.display_name }}</li>
+            {% empty %}
+                <li>No tiene compañías asociadas</li>
+            {% endfor %}
+        </ul>
+
+        <hr>
+        <a href="#" class="btn btn-warning">Editar</a>
+        <!-- url 'partner_edit' partner.id  -->
+        <a href="{% url 'partner_list' %}" class="btn btn-secondary">Volver</a>
+
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+<div class="sidebar">
+
+    <h5 class="text-uppercase text-secondary">Menú Principal</h5>
+
+    <a href="/" class="d-block text-white py-2">📊 Dashboard</a>
+
+    <hr class="border-secondary">
+
+    <h6 class="text-uppercase text-secondary">Billing</h6>
+    <a href="{% url 'partner_list' %}" class="d-block text-white py-1">👥 Partners</a>
+    <a href="#" class="d-block text-white py-1">📦 Productos</a>
+    <a href="#" class="d-block text-white py-1">🧾 Facturas</a>
+
+    <hr class="border-secondary">
+
+    <h6 class="text-uppercase text-secondary">Configuración</h6>
+    <a href="/users/" class="d-block text-white py-1">👤 Usuarios</a>
+
+    <hr class="border-secondary">
+
+    <h6 class="text-uppercase text-secondary">Otros</h6>
+    <a class="d-block text-white py-1 {% if request.resolver_match.url_name == 'view_logs' %}active{% endif %}" href="{% url 'view_logs' %}">
+        <i class="bi bi-journal-text"></i> Logs
+    </a>
+    <a class="d-block text-white py-1 {% if request.resolver_match.url_name == 'upload_file' %}active{% endif %}" href="{% url 'upload_file' %}">
+        <i class="bi bi-upload"></i> Subir Archivo
+    </a>
+    <a class="d-block text-white py-1 {% if request.resolver_match.url_name == 'pending_tasks_monitor' %}active{% endif %}" href="{% url 'pending_tasks_monitor' %}">
+        <i class="bi bi-clock-history"></i> Tareas Pendientes
+    </a>
+   
+</div>
