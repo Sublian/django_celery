@@ -1,26 +1,24 @@
 {% extends 'core/base.html' %}
+{% block title %}Detalle de Compañía{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
+<div class="card shadow">
+    <div class="card-header bg-primary text-white">
+        <h4>Detalle de Compañía</h4>
+    </div>
+    <div class="card-body">
 
-    <h2>🏢 {{ company.name }}</h2>
+        <p><strong>Nombre:</strong> {{ company.partner.name }}</p>
+        <p><strong>RUC:</strong> {{ company.partner.num_document }}</p>
+        <p><strong>Secuencia:</strong> {{ company.sequence }}</p>
+        <p><strong>Moneda:</strong> {{ company.currency }}</p>
+        <p><strong>Email:</strong> {{ company.email }}</p>
+        <p><strong>Activo:</strong> {{ company.active|yesno:"Sí,No" }}</p>
 
-    <p><strong>RUC:</strong> {{ company.tax_id }}</p>
-    <p><strong>Dirección:</strong> {{ company.address }}</p>
-    <p><strong>Día de Facturación:</strong> {{ company.billing_day }}</p>
+        <hr>
+        <a href="{% url 'billing:company_edit' company.id %}" class="btn btn-warning">Editar</a>
+        <a href="{% url 'billing:company_list' %}" class="btn btn-secondary">Volver</a>
 
-    <p>
-        <strong>Estado:</strong>
-        {% if company.active %}
-            <span class="badge bg-success">Activa</span>
-        {% else %}
-            <span class="badge bg-danger">Inactiva</span>
-        {% endif %}
-    </p>
-
-    <hr>
-
-    <a href="{% url 'company_edit' company.id %}" class="btn btn-primary">Editar</a>
-    <a href="{% url 'company_list' %}" class="btn btn-secondary">Volver</a>
-
+    </div>
 </div>
 {% endblock %}

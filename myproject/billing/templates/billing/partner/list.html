@@ -9,6 +9,7 @@
     <thead>
         <tr>
             <th>Nombre</th>
+            <th>Tipo de Documento</th>
             <th>Documento</th>
             <th>Email</th>
             <th>Estado</th>
@@ -20,7 +21,8 @@
         {% for p in partners %}
         <tr>
             <td>{{ p.display_name }}</td>
-            <td>{{ p.vat }}</td>
+            <td>{{ p.document_type|upper }}</td>
+            <td>{{ p.num_document }}</td>
             <td>{{ p.email }}</td>
             <td>{{ p.is_active|yesno:"Activo,Inactivo" }}</td>
             <td>

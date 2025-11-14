@@ -1,14 +1,13 @@
 {% extends 'core/base.html' %}
+{% block title %}Nueva Compañía{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
+<h2>Registrar Compañía</h2>
+<form method="post" enctype="multipart/form-data" class="card card-body shadow">
+    {% csrf_token %}
+    {{ form.as_p }}
 
-    <h2>➕ Crear Compañía</h2>
-    <form method="POST">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button class="btn btn-success">Guardar</button>
-        <a href="{% url 'company_list' %}" class="btn btn-secondary">Cancelar</a>
-    </form>
-
-</div>
+    <button type="submit" class="btn btn-success">Guardar</button>
+    <a href="{% url 'billing:company_list' %}" class="btn btn-secondary">Cancelar</a>
+</form>
 {% endblock %}

@@ -1,13 +1,13 @@
 {% extends 'core/base.html' %}
-{% block content %}
-<div class="container mt-4">
-    <h2>✏ Editar {{ company.name }}</h2>
+{% block title %}Editar Compañía{% endblock %}
 
-    <form method="POST">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button class="btn btn-primary">Guardar cambios</button>
-        <a href="{% url 'company_detail' company.id %}" class="btn btn-secondary">Cancelar</a>
-    </form>
-</div>
+{% block content %}
+<h2>Editar Compañía</h2>
+<form method="post" enctype="multipart/form-data" class="card card-body shadow">
+    {% csrf_token %}
+    {{ form.as_p }}
+
+    <button type="submit" class="btn btn-primary">Actualizar</button>
+    <a href="{% url 'billing:company_detail' company.id %}" class="btn btn-secondary">Volver</a>
+</form>
 {% endblock %}

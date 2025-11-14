@@ -76,8 +76,8 @@ class CurrencyRate(models.Model):
     def __str__(self): return f"{self.currency.name} - {self.rate} on {self.date_rate}"
     
 class Company(models.Model):
-    name = models.CharField(max_length=255, verbose_name="Razón Social o Nombre Comercial")
-    vat = models.CharField(max_length=11, unique=True, verbose_name="RUC")
+    # name = models.CharField(max_length=255, verbose_name="Razón Social o Nombre Comercial")
+    # vat = models.CharField(max_length=11, unique=True, verbose_name="RUC")
     partner = models.ForeignKey(Partner, on_delete=models.PROTECT, verbose_name="Partner Asociado")
     sequence = models.CharField(max_length=64, verbose_name="Secuencia de Documentos")
     report_header = models.TextField(blank=True, null=True, verbose_name="Encabezado de Reportes")
@@ -85,7 +85,20 @@ class Company(models.Model):
     logo_web = models.ImageField(upload_to="company/logos/", blank=True, null=True, verbose_name="Logo para Web")
     email = models.EmailField(blank=True, null=True, verbose_name="Correo Electrónico")
     active = models.BooleanField(default=True, verbose_name="Activo")
-    def __str__(self): return self.name
+    tax_calculation_rounding_method = models.CharField(max_length=20, choices=[('global','round_globally' ), ('por linea','round_per_line')], default='round_globally', verbose_name="Método de Redondeo de Cálculo de Impuestos")
+    invoice_term = models.TextField(blank=True, null=True, verbose_name="Términos y Condiciones de la Factura")
+    account_tax_periodicity = models.CharField(max_length=20, choices=[('monthly','Mensual' ), ('quarterly','Trimestral'), ('biannual','Semestral'), ('annual','Anual')], default='monthly', verbose_name="Periodicidad de Declaración de Impuestos")
+    currency = models.ForeignKey(Currency, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Moneda Predeterminada")
+    account_tax_periodicity_reminder_day = models.IntegerField(default=7, verbose_name="Día de Recordatorio de Periodicidad de Impuestos")
+    sunat_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0, verbose_name="Monto para SUNAT")
+    currency_provider = models.CharField(max_length=50, blank=True, null=True, default='sunat', verbose_name="Proveedor de Moneda Extranjera")
+    theme_color = models.CharField(max_length=20, default='light', verbose_name="Color del Tema")
+    theme_text_color = models.CharField(max_length=20, default='dark', verbose_name="Color del Texto del Tema")
+    text_color = models.CharField(max_length=20, default='black', verbose_name="Color del Texto")
+    company_color = models.CharField(max_length=20, default='blue', verbose_name="Color de la Compañía")
+    bank_comment = models.TextField(blank=True, null=True, verbose_name="Comentario Bancario")
+    def __str__(self): return self.partner.display_name or self.partner.name
+    
 
 class Product(models.Model):
     name = models.CharField(max_length=255)
