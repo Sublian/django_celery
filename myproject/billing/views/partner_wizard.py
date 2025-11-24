@@ -1,65 +1,119 @@
-from formtools.wizard.views import SessionWizardView
+# myproject/billing/views/partner_wizard.py
+from django.views.generic import FormView, TemplateView
 from django.shortcuts import redirect
-from billing.forms.partner_step1 import PartnerStep1Form
-from billing.forms.partner_step2_user import PartnerStep2UserForm
+from django.contrib import messages
+from django.urls import reverse
+from billing.views.mixins import WizardSessionRequiredMixin
+
+from billing.forms.partner_steps import (
+    PartnerStep1Form,
+    PartnerStep2Form,
+    PartnerStep3Form
+)
 from billing.models import Partner
 from users.models import User
 
 
-FORMS = [
-    ("step1", PartnerStep1Form),
-    ("step2_user", PartnerStep2UserForm),
-]
+#   PASO 1  
+class PartnerWizardStep1(FormView):
+    template_name = "billing/partner/wizard/step1.html"
+    form_class = PartnerStep1Form
 
-class PartnerWizard(SessionWizardView):
-    form_list = FORMS
-    template_name = "billing/partner/wizard/step.html"
+    def form_valid(self, form):
+        data = form.cleaned_data.copy()
 
-    def get_form_step_data(self, step):
-        return self.get_cleaned_data_for_step(step)
+        # Convertir parent a ID
+        if data.get("parent"):
+            data["parent"] = data["parent"].id
+            
+        self.request.session["partner_step1"] = data
 
-    def get_form_instance(self, step):
-        return None
+        # 👇 Condición: si NO es cliente, saltarse el paso 2
+        if not data.get("is_customer"):
+            return redirect("billing:partner_wizard_step3")
 
-    def get_next_step(self, step, form=None):
-        """Controla la bifurcación hacia paso 2 solo si marcó usuario del sistema."""
-        if step == "step1":
-            data = self.get_cleaned_data_for_step("step1")
-            if data and data.get("is_system_user"):
-                return "step2_user"
-            return self.steps.next
-        return super().get_next_step(step, form)
+        return redirect("billing:partner_wizard_step2")
 
-    def done(self, form_list, **kwargs):
-        data1 = self.get_cleaned_data_for_step("step1")
+#   PASO 2  
+class PartnerWizardStep2(WizardSessionRequiredMixin, FormView):
+    template_name = "billing/partner/wizard/step2.html"
+    form_class = PartnerStep2Form
+    required_key = "partner_step1"
 
-        # 1. Crear Partner
-        partner = Partner.objects.create(
-            name=data1["name"],
-            display_name=data1["display_name"],
-            email=data1["email"],
-            document_type=data1["document_type"],
-            num_document=data1["num_document"],
-            phone=data1["phone"],
-            is_company=data1["is_company"],
-            is_customer=data1["is_customer"],
-            is_supplier=data1["is_supplier"],
-        )
-        partner.companies.set(data1["companies"])
+    def form_valid(self, form):
+        data = form.cleaned_data.copy()
+        self.request.session["partner_step2"] = data
+        return redirect("billing:partner_wizard_step3")
 
-        # 2. Crear usuario si aplica
-        if data1["is_system_user"]:
-            data2 = self.get_cleaned_data_for_step("step2_user")
+
+#   PASO 3  
+class PartnerWizardStep3(WizardSessionRequiredMixin, FormView):
+    template_name = "billing/partner/wizard/step3.html"
+    form_class = PartnerStep3Form
+    required_key = "partner_step1"  # step2 es opcional
+
+    def form_valid(self, form):
+        data = form.cleaned_data.copy()
+
+        # Convertir queryset de companies a lista de IDs
+        if data.get("companies"):
+            data["companies"] = [c.id for c in data["companies"]]
+
+        self.request.session["partner_step3"] = data
+        return redirect("billing:partner_wizard_finish")
+
+
+#   FINALIZACIÓN DEL WIZARD  
+class PartnerWizardFinish(WizardSessionRequiredMixin, TemplateView):
+    template_name = "billing/partner/wizard/finish.html"
+    required_key = "partner_step1"
+
+    def get(self, request, *args, **kwargs):
+
+        data1 = request.session.get("partner_step1")
+        data2 = request.session.get("partner_step2")
+        data3 = request.session.get("partner_step3")
+
+        if not data1:
+            messages.error(request, "El wizard está incompleto.")
+            return redirect("billing:partner_wizard_step1")
+
+        # --- Preparar relación padre
+        parent_id = data1.pop("parent", None)
+        if parent_id:
+            data1["parent_id"] = parent_id
+
+        # --- Crear Partner
+        partner = Partner.objects.create(**data1)
+
+        # --- Crear usuario si fue solicitado
+        if data2 and data2.get("create_user"):
+            # Intentar usar documento del usuario (Step2)
+            doc_number = data2.get("document_number")
+
+            # Si no viene, usar el documento del partner
+            if not doc_number:
+                doc_number = partner.num_document
 
             user = User.objects.create_user(
-                username=data2["username"],
-                login=data2["login"],
+                username=data2["email"],
                 email=data2["email"],
-                phone=data2["phone"],
                 password=data2["password"],
+                document_type=partner.document_type,
+                document_number=doc_number,
+                phone=partner.phone,
             )
 
             partner.user = user
             partner.save()
 
-        return redirect("billing:partner_detail", pk=partner.id)
+        # --- Asignar compañías
+        if data3 and data3.get("companies"):
+            partner.companies.set(data3["companies"])
+
+        # --- Limpiar sesión
+        for k in ["partner_step1", "partner_step2", "partner_step3"]:
+            request.session.pop(k, None)
+
+        messages.success(request, "Partner creado exitosamente.")
+        return redirect("billing:partner_list")

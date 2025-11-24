@@ -1,28 +1,24 @@
-{% extends 'core/base.html' %}
+{% extends "core/base.html" %}
 
 {% block content %}
-<div class="card shadow">
-    <div class="card-header bg-primary text-white">
-        <h4>Crear Partner – Paso {{ wizard.steps.step1 }} de {{ wizard.steps.count }}</h4>
+<div class="container mt-4">
+
+    {% include "billing/partner/wizard/_progress.html" with step=1 progress=33 %}
+
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h4>Paso 1: Datos Básicos del Partner</h4>
+        </div>
+
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+
+                <button class="btn btn-primary">Siguiente</button>
+            </form>
+        </div>
     </div>
-    <div class="card-body">
 
-        <form method="post">
-            {% csrf_token %}
-            {{ wizard.management_form }}
-
-            {{ wizard.form.as_p }}
-
-            <div class="mt-3">
-                {% if wizard.steps.prev %}
-                    <button name="wizard_goto_step" value="{{ wizard.steps.prev }}"
-                            class="btn btn-secondary">Anterior</button>
-                {% endif %}
-
-                <button type="submit" class="btn btn-primary">Siguiente</button>
-            </div>
-        </form>
-
-    </div>
 </div>
 {% endblock %}

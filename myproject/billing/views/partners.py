@@ -4,7 +4,7 @@ from django.views.generic import (
     ListView, CreateView, UpdateView, DetailView
 )
 from django.shortcuts import redirect
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from billing.models import Partner
 
 
@@ -32,6 +32,19 @@ class PartnerDetailView(DetailView):
     model = Partner
     template_name = "billing/partner/detail.html"
     context_object_name = "partner"
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        partner = self.object
+
+        context["breadcrumb"] = [
+            {"label": "Dashboard", "url": "/"},
+            {"label": "Partners", "url": reverse("billing:partner_list")},
+            {"label": partner.display_name, "url": None},
+        ]
+
+        return context
 
 
 class PartnerDeleteView(UpdateView):

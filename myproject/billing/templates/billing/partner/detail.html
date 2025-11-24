@@ -3,24 +3,42 @@
 {% block title %}Detalle de Partner{% endblock %}
 
 {% block content %}
+
+{% include 'core/includes/breadcrumb.html' %}
+
 <div class="card shadow">
     <div class="card-header bg-primary text-white">
         <h4>Detalle del Partner</h4>
     </div>
     <div class="card-body">
 
-        <p><strong>Nombre:</strong> {{ partner.display_name }}</p>
-        <p><strong>Email:</strong> {{ partner.email }}</p>
-        <p><strong>Teléfono:</strong> {{ partner.phone }}</p>
+        <p><strong>Nombre:</strong> {{ partner.display_name|default:"-" }}</p>
+        <p><strong>Email:</strong> {{ partner.email|default:"-" }}</p>
+        <p><strong>Teléfono:</strong> {{ partner.phone|default:"-" }}</p>
 
         <p><strong>¿Es compañía?</strong> 
             {{ partner.is_company|yesno:"Sí,No" }}
         </p>
 
+        <p>
+            <strong>Partner Padre:</strong>
+            {% if partner.parent %}
+                <a href="{% url 'billing:partner_detail' partner.parent.id %}">
+                    {{ partner.parent.display_name }}
+                </a>
+            {% else %}
+                -
+            {% endif %}
+        </p>
+
         <p><strong>Compañías asociadas:</strong></p>
         <ul>
             {% for c in partner.companies.all %}
-                <li>{{ c.display_name }}</li>
+                <li>
+                    <a href="{% url 'billing:company_detail' c.id %}">
+                        {{ c.partner.display_name|default:"(Sin nombre)" }}
+                    </a>
+                </li>
             {% empty %}
                 <li>No tiene compañías asociadas</li>
             {% endfor %}

@@ -9,7 +9,12 @@ from .views.partners import (
     PartnerDeleteView,
 )
 
-from billing.views.partner_wizard import PartnerWizard
+from billing.views.partner_wizard import (
+    PartnerWizardStep1,
+    PartnerWizardStep2,
+    PartnerWizardStep3,
+    PartnerWizardFinish
+)
 
 from .views.company import (
     company_list,
@@ -34,5 +39,8 @@ urlpatterns = [
     path('company/<int:pk>/edit/', company_edit, name='company_edit'),
     path('company/<int:pk>/toggle/', company_toggle_active, name='company_toggle_active'),
     
-    path("partners/wizard/new/", PartnerWizard.as_view(), name="partner_wizard"),
+    path("partners/wizard/step1/", PartnerWizardStep1.as_view(), name="partner_wizard_step1"),
+    path("partners/wizard/step2/", PartnerWizardStep2.as_view(), name="partner_wizard_step2"),
+    path("partners/wizard/step3/", PartnerWizardStep3.as_view(), name="partner_wizard_step3"),
+    path("partners/wizard/finish/", PartnerWizardFinish.as_view(), name="partner_wizard_finish"),
 ]

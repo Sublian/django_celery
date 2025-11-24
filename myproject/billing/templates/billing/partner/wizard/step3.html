@@ -1,0 +1,15 @@
+{% extends "core/base.html" %}
+{% block content %}
+{% include "billing/partner/wizard/_progress.html" with step=1 progress=100 %}
+
+<h3>Paso 3: Selección de Compañías</h3>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <a href="{% url 'billing:partner_wizard_step2' %}" class="btn btn-secondary">
+        ← Anterior
+    </a>
+    <button class="btn btn-success">Finalizar ✓</button>
+</form>
+{% endblock %}

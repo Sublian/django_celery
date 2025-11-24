@@ -1,0 +1,16 @@
+{% extends "core/base.html" %}
+{% block content %}
+{% include "billing/partner/wizard/_progress.html" with step=1 progress=66 %}
+
+<h3>Paso 2: Datos de Usuario</h3>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <a href="{% url 'billing:partner_wizard_step1' %}" class="btn btn-secondary">
+        ← Anterior
+    </a>
+    <button class="btn btn-primary">Siguiente →</button>
+
+</form>
+{% endblock %}
