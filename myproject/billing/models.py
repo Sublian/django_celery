@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
@@ -322,16 +323,40 @@ class SaleSubscription(TimeStampedModel):
         ('quarterly', 'Trimestral'),
         ('yearly', 'Anual'),
     ], default='monthly')
+    contract_template = models.ForeignKey(
+        'ContractTemplate',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='subscriptions',
+        verbose_name="Plantilla de Contrato"
+    )
+    # === CAMPOS DE SEGUIMIENTO ===
+    invoices_generated = models.IntegerField(default=0, verbose_name="Facturas Generadas")
+    total_invoiced = models.DecimalField(max_digits=18, decimal_places=2, default=0, verbose_name="Total Facturado")
     
     class Meta:
         indexes = [
             models.Index(fields=['code']),
             models.Index(fields=['state']),
             models.Index(fields=['next_invoice_date']),
+            models.Index(fields=['contract_template']),
         ]
     
     def __str__(self):
         return f"Sub #{self.id} - {self.partner.name}"
+    
+    def calculate_next_invoice_date(self):
+        """Calcula la próxima fecha de facturación basada en la plantilla"""
+        if self.contract_template and self.date_start:
+            return self.contract_template.get_next_invoice_date(self.date_start)
+        return None
+    
+    def save(self, *args, **kwargs):
+        """Sobrescribir save para calcular automáticamente next_invoice_date"""
+        if not self.next_invoice_date and self.contract_template:
+            self.next_invoice_date = self.calculate_next_invoice_date()
+        super().save(*args, **kwargs)
 
 class SaleSubscriptionLine(TimeStampedModel):
     subscription = models.ForeignKey(SaleSubscription, related_name="lines", on_delete=models.CASCADE)
@@ -640,3 +665,140 @@ class SystemParameter(TimeStampedModel):
     
     def __str__(self):
         return f"{self.key} = {self.value}"
+    
+
+class ContractTemplate(TimeStampedModel):
+    """Plantillas de contratos para definir tipos de contratos recurrentes"""
+    active = models.BooleanField(default=True, verbose_name="Activo")
+    name = models.CharField(max_length=255, verbose_name="Nombre del Contrato")
+    code = models.CharField(max_length=50, blank=True, null=True, verbose_name="Código")
+    description = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    
+    # === CONFIGURACIÓN DE RECURRENCIA ===
+    recurring_rule_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('daily', 'Diario'),
+            ('weekly', 'Semanal'),
+            ('monthly', 'Mensual'),
+            ('yearly', 'Anual'),
+        ],
+        default='monthly',
+        verbose_name="Tipo de Recurrencia"
+    )
+    recurring_interval = models.IntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+        verbose_name="Intervalo de Recurrencia"
+    )
+    recurring_rule_boundary = models.CharField(
+        max_length=20,
+        choices=[
+            ('unlimited', 'Ilimitado'),
+            ('limited', 'Limitado'),
+        ],
+        default='unlimited',
+        verbose_name="Límite de Recurrencia"
+    )
+    recurring_rule_count = models.IntegerField(
+        default=0,
+        validators=[MinValueValidator(0)],
+        verbose_name="Número de Repeticiones"
+    )
+    
+    # === CONFIGURACIÓN DE FACTURACIÓN ===
+    payment_mode = models.CharField(
+        max_length=20,
+        choices=[
+            ('manual', 'Manual'),
+            ('draft_invoice', 'Borrador de Factura Automático'),
+            ('validate_invoice', 'Factura Validada Automática'),
+        ],
+        default='manual',
+        verbose_name="Modo de Facturación"
+    )
+    auto_close_limit = models.IntegerField(
+        default=15,
+        validators=[MinValueValidator(1), MaxValueValidator(31)],
+        verbose_name="Límite de Cierre Automático (días)"
+    )
+    
+    # === CONFIGURACIONES ADICIONALES ===
+    user_closable = models.BooleanField(
+        default=True,
+        verbose_name="Usuario Puede Cerrar"
+    )
+    calculate_upsell = models.BooleanField(
+        default=False,
+        verbose_name="Calcular Upsell"
+    )
+    is_massive = models.BooleanField(
+        default=False,
+        verbose_name="Es Masivo"
+    )
+    
+    # === RELACIONES ===
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        verbose_name="Compañía",
+        related_name='contract_templates'
+    )
+    # invoice_mail_template = models.ForeignKey(
+    #     'mail.MailTemplate',  # Asumiendo que existe un modelo de plantillas de email
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True,
+    #     verbose_name="Plantilla de Email para Factura"
+    # )
+    
+    # === METADATOS ===
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_contract_templates',
+        verbose_name="Creado Por"
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='updated_contract_templates',
+        verbose_name="Actualizado Por"
+    )
+    
+    class Meta:
+        db_table = 'billing_contracttemplate'
+        verbose_name = "Plantilla de Contrato"
+        verbose_name_plural = "Plantillas de Contratos"
+        indexes = [
+            models.Index(fields=['active']),
+            models.Index(fields=['code']),
+            models.Index(fields=['is_massive']),
+        ]
+    
+    def __str__(self):
+        return f"{self.code} - {self.name}" if self.code else self.name
+    
+    @property
+    def duration_months(self):
+        """Calcula la duración total en meses"""
+        if self.recurring_rule_boundary == 'limited':
+            return self.recurring_rule_count
+        return None  # Ilimitado
+    
+    def get_next_invoice_date(self, last_invoice_date):
+        """Calcula la próxima fecha de facturación basada en la última factura"""
+        
+        if self.recurring_rule_type == 'monthly':
+            return last_invoice_date + relativedelta(months=self.recurring_interval)
+        elif self.recurring_rule_type == 'yearly':
+            return last_invoice_date + relativedelta(years=self.recurring_interval)
+        elif self.recurring_rule_type == 'weekly':
+            return last_invoice_date + relativedelta(weeks=self.recurring_interval)
+        else:  # daily
+            return last_invoice_date + relativedelta(days=self.recurring_interval)
+    
