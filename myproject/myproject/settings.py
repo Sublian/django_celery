@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'core',
     'billing',
     "formtools",
+    'django_extensions',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

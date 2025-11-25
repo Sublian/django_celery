@@ -134,7 +134,7 @@ class Product(models.Model):
         ('service', 'Servicio')
     ], default='product')
     onu_code = models.CharField(max_length=10, blank=True, null=True)
-    is_advance = models.BooleanField(default=False)
+    # is_advance = models.BooleanField(default=False)
     uom_code = models.CharField(max_length=5, default='NIU', choices=[
         ('NIU', 'Unidad'),
         ('ZZ', 'Servicio')
