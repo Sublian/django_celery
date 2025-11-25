@@ -292,9 +292,24 @@ class InvoiceSerie(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
     is_active = models.BooleanField(default=True)
     manual = models.BooleanField(default=False)
+    # === NUEVA RELACIÓN CON SECUENCIA ===
+    sequence = models.ForeignKey(
+        'Sequence',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='invoice_series',
+        verbose_name="Secuencia Asociada"
+    )
     
     def __str__(self):
         return f"{self.series} - {self.name}"
+    
+    def get_next_reference(self):
+        """Obtiene la próxima referencia de la secuencia asociada"""
+        if self.sequence:
+            return self.sequence.next_by_code()
+        return None
 
 # === MODELOS PRINCIPALES DE FACTURACIÓN MEJORADOS ===
 
@@ -802,3 +817,99 @@ class ContractTemplate(TimeStampedModel):
         else:  # daily
             return last_invoice_date + relativedelta(days=self.recurring_interval)
     
+# date: 2025-11-25
+class Sequence(TimeStampedModel):
+    """Secuencias para numeración de documentos (simplificado de ir_sequence)"""
+    name = models.CharField(max_length=255, verbose_name="Nombre")
+    code = models.CharField(
+        max_length=100, 
+        unique=True, 
+        verbose_name="Código",
+        help_text="Código único para identificar la secuencia"
+    )
+    implementation = models.CharField(
+        max_length=20,
+        choices=[
+            ('standard', 'Standard'),
+            ('no_gap', 'No Gap'),
+        ],
+        default='standard',
+        verbose_name="Implementación"
+    )
+    active = models.BooleanField(default=True, verbose_name="Activa")
+    prefix = models.CharField(
+        max_length=50, 
+        blank=True, 
+        verbose_name="Prefijo",
+        help_text="Ej: F001- para facturas"
+    )
+    suffix = models.CharField(
+        max_length=50, 
+        blank=True, 
+        verbose_name="Sufijo"
+    )
+    number_next = models.IntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+        verbose_name="Próximo Número"
+    )
+    number_increment = models.IntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+        verbose_name="Incremento"
+    )
+    padding = models.IntegerField(
+        default=8,
+        validators=[MinValueValidator(1)],
+        verbose_name="Relleno de ceros"
+    )
+    
+    # === RELACIONES ===
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        verbose_name="Compañía",
+        related_name='sequences'
+    )
+    
+    class Meta:
+        db_table = 'billing_sequence'
+        verbose_name = "Secuencia"
+        verbose_name_plural = "Secuencias"
+        indexes = [
+            models.Index(fields=['code']),
+            models.Index(fields=['company', 'active']),
+        ]
+    
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+    
+    def get_next_number(self):
+        """Obtiene el próximo número de la secuencia y lo incrementa"""
+        if not self.active:
+            raise ValueError(f"La secuencia {self.code} no está activa")
+        
+        next_number = self.number_next
+        self.number_next += self.number_increment
+        self.save(update_fields=['number_next', 'updated_at'])
+        
+        return next_number
+    
+    def format_number(self, number):
+        """Formatea el número según el prefijo, sufijo y padding"""
+        formatted_number = str(number).zfill(self.padding)
+        
+        result = ""
+        if self.prefix:
+            result += self.prefix
+        result += formatted_number
+        if self.suffix:
+            result += self.suffix
+            
+        return result
+    
+    def next_by_code(self):
+        """Obtiene el próximo número formateado (equivalente a next_by_code de Odoo)"""
+        next_number = self.get_next_number()
+        return self.format_number(next_number)
+
