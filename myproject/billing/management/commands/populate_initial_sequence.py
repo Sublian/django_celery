@@ -26,7 +26,7 @@ class Command(BaseCommand):
         # Secuencias para compañía 2
         sequences_company_2 = [
             {
-                'name': 'F001-NEXT',
+                'name': 'Secuencia de Factura Electronica F001-NEXT',
                 'code': 'sequence.factura.company2',
                 'prefix': 'F001-',
                 'number_next': 10000,
@@ -35,7 +35,7 @@ class Command(BaseCommand):
                 'company': company_2
             },
             {
-                'name': 'B001-NEXT',
+                'name': 'Secuencia de Boleta Electronica B001-NEXT',
                 'code': 'sequence.boleta.company2', 
                 'prefix': 'B001-',
                 'number_next': 1000,

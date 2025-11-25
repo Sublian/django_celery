@@ -286,7 +286,7 @@ class AccountPaymentTermLine(TimeStampedModel):
 
 class InvoiceSerie(models.Model):
     """Series de facturación"""
-    name = models.CharField(max_length=10)
+    name = models.CharField(max_length=80)
     series = models.CharField(max_length=4)
     journal = models.ForeignKey(Journal, on_delete=models.CASCADE)
     company = models.ForeignKey(Company, on_delete=models.CASCADE)

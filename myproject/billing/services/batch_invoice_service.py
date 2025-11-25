@@ -200,6 +200,11 @@ class BatchInvoiceService:
         Calcula la fecha de vencimiento basada en términos de pago
         """
         # Por defecto, 30 días después
+                # Calcular próxima fecha de facturación
+        if subscription.contract_template:
+            return  subscription.contract_template.get_next_invoice_date(invoice_date)
+            
+        # Lógica por defecto: mensual
         return invoice_date + timedelta(days=30)
     
     def _create_invoice_lines(self, invoice, subscription):
