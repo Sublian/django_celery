@@ -1,4 +1,4 @@
-# billing/management/commands/populate_subscriptions.py
+# billing/management/commands/populate_subscriptions_final.py
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import datetime, timedelta
@@ -7,12 +7,11 @@ from billing.models import (
     SaleSubscription, SaleSubscriptionLine, Partner, Company, 
     Product, Tax, ContractTemplate
 )
-from billing.services.sequence_service import get_next_subscription_code
 from decimal import Decimal
 import random
 
 class Command(BaseCommand):
-    help = 'Crear suscripciones de prueba con líneas'    
+    help = 'Crear suscripciones de prueba usando plantillas existentes'
     
     def add_arguments(self, parser):
         parser.add_argument(
@@ -21,12 +20,11 @@ class Command(BaseCommand):
             default=5,
             help='Número de suscripciones a crear por compañía (default: 5)'
         )
-
+    
     def handle(self, *args, **options):
         self.stdout.write('🚀 Creando suscripciones de prueba...')
         
         subscription_count = options.get('count', 5)
-        print(f"📊 Creando hasta {subscription_count} suscripciones por compañía")
         self.create_test_subscriptions(subscription_count)
         
         self.stdout.write(
@@ -34,51 +32,46 @@ class Command(BaseCommand):
         )
     
     def create_test_subscriptions(self, max_per_company):
-        """Crear suscripciones de prueba con datos realistas"""
+        """Crear suscripciones usando solo plantillas existentes"""
         
-        # Obtener datos base
         companies = Company.objects.all()
         products = Product.objects.filter(is_active=True)
         taxes = Tax.objects.filter(is_active=True, type_tax_use='sale')
         
-        if not all([companies, products, taxes]):
-            self.stdout.write(self.style.ERROR('    ❌ Faltan datos base para crear suscripciones'))
-            return
-        
         total_created = 0
-
+        
         for company in companies:
-            self.stdout.write(f"📋 Creando suscripciones para: {company}")
+            self.stdout.write(f"📋 Procesando compañía: {company}")
             
-             # Verificar que existan plantillas para esta compañía
+            # Verificar que existan plantillas para esta compañía
             company_templates = ContractTemplate.objects.filter(company=company, active=True)
             if not company_templates.exists():
                 self.stdout.write(f"❌ No hay plantillas activas para: {company}")
                 continue
             
-             # Obtener partners de esta compañía usando la relación ManyToMany
+            # Obtener clientes de esta compañía
             company_partners = Partner.objects.filter(
                 companies=company, 
                 is_customer=True, 
                 is_active=True
-            )[:max_per_company] # Limitar al máximo por compañía
+            )[:max_per_company]
             
             if not company_partners.exists():
-                self.stdout.write(f"    ⚠️ No hay clientes para la compañía: {company}")
+                self.stdout.write(f"⚠️ No hay clientes para: {company}")
                 continue
             
             created_for_company = 0
             
             for partner in company_partners:
                 if created_for_company >= max_per_company:
-                    self.stdout.write(f"    ℹ️ Límite alcanzado para {company}, saltando resto de partners.")
                     break
+                
                 try:
-                    # MEJORA: Usar secuencia para generar código único
-                    subscription_code = get_next_subscription_code(company)
-                    
                     # Usar plantilla existente aleatoria
                     template = random.choice(list(company_templates))
+                    
+                    # Crear código único simple (sin secuencia por ahora)
+                    subscription_code = f"SUB{company.id:02d}{partner.id:05d}{total_created:03d}"
                     
                     subscription = self._create_subscription(
                         partner, company, template, products, taxes, subscription_code
@@ -91,18 +84,26 @@ class Command(BaseCommand):
                         
                 except Exception as e:
                     self.stdout.write(f"❌ Error creando suscripción para {partner.name}: {str(e)}")
-                    
+                    import traceback
+                    self.stdout.write(traceback.format_exc())
+            
             self.stdout.write(f"   📊 Creadas para {company}: {created_for_company}")
         
         self.stdout.write(f"\n🎯 Total suscripciones creadas: {total_created}")
-
+    
     def _create_subscription(self, partner, company, template, products, taxes, subscription_code):
-        """Crear una suscripción individual con código secuencial"""
-
+        """Crear una suscripción individual"""
+        
+        # Fechas basadas en la plantilla
         date_start = timezone.now().date() - timedelta(days=random.randint(0, 60))
         date_end = self._calculate_end_date(date_start, template)
+        next_invoice_date = self._calculate_next_invoice_date(date_start, template)
         
-        # MEJORA: Usar el código generado por la secuencia
+        # CORRECCIÓN: Usar formato consistente SUB{company_id}-{partner_id}{sequential}
+        # Ejemplo: SUB01-020006, SUB02-010013
+        subscription_code = f"SUB{company.id:02d}-{partner.id:06d}"
+        
+        # Crear suscripción
         subscription = SaleSubscription.objects.create(
             partner=partner,
             company=company,
@@ -112,16 +113,16 @@ class Command(BaseCommand):
             recurring_total=Decimal('0'),
             recurring_monthly=Decimal('0'),
             state='active',
-            code=subscription_code,  # Usar código secuencial
+            code=subscription_code,
             description=f"{template.name} - {partner.display_name or partner.name}",
             uuid=f"sub-{company.id}-{partner.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
             health='normal',
             to_renew=True,
-            next_invoice_date=self._calculate_next_invoice_date(date_start, template),
+            next_invoice_date=next_invoice_date,
             invoicing_interval=template.recurring_rule_type
         )
         
-        # Crear líneas
+        # Crear líneas de suscripción
         total_monthly = self._create_subscription_lines(subscription, products, taxes)
         
         # Calcular total del contrato
@@ -133,12 +134,6 @@ class Command(BaseCommand):
         subscription.save()
         
         return subscription
-            
-    def _calculate_start_date(self):
-        """Calcular fecha de inicio realista"""
-        # Fecha entre hoy y 90 días atrás
-        days_ago = random.randint(0, 90)
-        return timezone.now().date() - timedelta(days=days_ago)
     
     def _calculate_end_date(self, start_date, template):
         """Calcular fecha de fin basada en la plantilla"""
@@ -158,17 +153,13 @@ class Command(BaseCommand):
     
     def _calculate_next_invoice_date(self, start_date, template):
         """Calcular próxima fecha de facturación basada en la plantilla"""
-        # MEJORA: Usar la lógica de la plantilla para calcular la próxima factura
         today = timezone.now().date()
         
         if template.recurring_rule_type == 'daily':
-            # Para facturación diaria, próxima factura es mañana
             next_date = today + timedelta(days=template.recurring_interval)
         elif template.recurring_rule_type == 'weekly':
-            # Para facturación semanal, calcular próximo día de la semana
             next_date = today + timedelta(weeks=template.recurring_interval)
         elif template.recurring_rule_type == 'monthly':
-            # Para facturación mensual, mismo día del próximo mes
             next_date = today + relativedelta(months=template.recurring_interval)
             # Asegurar que el día existe en el próximo mes
             try:
@@ -176,10 +167,8 @@ class Command(BaseCommand):
             except ValueError:
                 next_date = next_date.replace(day=28)
         elif template.recurring_rule_type == 'yearly':
-            # Para facturación anual, mismo día del próximo año
             next_date = today + relativedelta(years=template.recurring_interval)
         else:
-            # Por defecto: 30 días
             next_date = today + timedelta(days=30)
         
         return next_date
@@ -226,15 +215,12 @@ class Command(BaseCommand):
         
         # Ajustar según el tipo de facturación
         if template.recurring_rule_type == 'daily':
-            # Para facturación diaria, estimar 30 días por mes
             days_duration = (end_date - start_date).days
             billing_cycles = max(1, days_duration // template.recurring_interval)
             return monthly_total * billing_cycles
         elif template.recurring_rule_type == 'weekly':
-            # Para facturación semanal, calcular número de semanas
             weeks_duration = (end_date - start_date).days // 7
             billing_cycles = max(1, weeks_duration // template.recurring_interval)
             return monthly_total * billing_cycles
         else:
-            # Para mensual y anual, usar meses
             return monthly_total * months_duration

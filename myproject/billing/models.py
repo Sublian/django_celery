@@ -1,5 +1,5 @@
 # billing/models.py
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -314,30 +314,31 @@ class InvoiceSerie(models.Model):
 # === MODELOS PRINCIPALES DE FACTURACIÓN MEJORADOS ===
 
 class SaleSubscription(TimeStampedModel):
-    partner = models.ForeignKey(Partner, on_delete=models.PROTECT)
-    date_start = models.DateField()
-    date_end = models.DateField(null=True, blank=True)
-    recurring_invoice_count = models.IntegerField(default=0)
-    recurring_invoice_day = models.IntegerField(default=1)
-    recurring_total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
-    recurring_monthly = models.DecimalField(max_digits=18, decimal_places=2, default=0)
-    company = models.ForeignKey(Company, on_delete=models.PROTECT)
-    state = models.CharField(max_length=20, default="active")
-    code = models.CharField(max_length=50, null=True, blank=True)
-    description = models.TextField(blank=True, null=True)
-    uuid = models.CharField(max_length=64, unique=True)
-    health = models.CharField(max_length=20, default="normal")
-    to_renew = models.BooleanField(default=True)
+    partner = models.ForeignKey(Partner, on_delete=models.PROTECT, help_text="Cliente asociado a la suscripción")
+    date_start = models.DateField(help_text="Fecha de inicio del contrato")
+    date_end = models.DateField(null=True, blank=True, help_text="Fecha de finalización del contrato")
+    recurring_invoice_count = models.IntegerField(default=0, help_text="Número de facturas recurrentes generadas")
+    recurring_invoice_day = models.IntegerField(default=1, help_text="Día del mes para facturación recurrente")
+    recurring_total = models.DecimalField(max_digits=18, decimal_places=2, default=0, help_text="Total recurrente del contrato")
+    recurring_monthly = models.DecimalField(max_digits=18, decimal_places=2, default=0, help_text="Monto mensual recurrente")
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, help_text="Compañía asociada a la suscripción")
+    state = models.CharField(max_length=20, default="active", help_text="Estado de la suscripción")
+    code = models.CharField(max_length=50, null=True, blank=True, help_text="Código interno de la suscripción")
+    description = models.TextField(blank=True, null=True, help_text="Descripción de la suscripción")
+    uuid = models.CharField(max_length=64, unique=True, help_text="Identificador único universal de la suscripción")
+    health = models.CharField(max_length=20, default="normal", help_text="Estado de salud de la suscripción")
+    to_renew = models.BooleanField(default=True, help_text="Indica si la suscripción debe renovarse automáticamente")
+    is_active = models.BooleanField(default=True, help_text="Indica si la suscripción está activa")
     
     # === NUEVOS CAMPOS ===
-    next_invoice_date = models.DateField(null=True, blank=True)
+    next_invoice_date = models.DateField(null=True, blank=True, help_text="Próxima fecha programada para facturación")
     invoicing_interval = models.CharField(max_length=20, choices=[
         ('daily', 'Diario'),
         ('weekly', 'Semanal'),
         ('monthly', 'Mensual'),
         ('quarterly', 'Trimestral'),
         ('yearly', 'Anual'),
-    ], default='monthly')
+    ], default='monthly', help_text="Intervalo de facturación")
     contract_template = models.ForeignKey(
         'ContractTemplate',
         on_delete=models.PROTECT,
@@ -452,7 +453,7 @@ class AccountMove(TimeStampedModel):
     )
     amount_tax = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     amount_total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
-    invoice_origin = models.CharField(max_length=128, null=True, blank=True)
+    invoice_origin = models.CharField(max_length=128, null=True, blank=True, Help_text="Referencia de la factura original")
     xml_version = models.FileField(upload_to="invoices/xml/", null=True, blank=True)
     qr_code = models.URLField(null=True, blank=True)
     
@@ -879,6 +880,7 @@ class Sequence(TimeStampedModel):
         indexes = [
             models.Index(fields=['code']),
             models.Index(fields=['company', 'active']),
+            models.Index(fields=['company', 'code']),
         ]
     
     def __str__(self):
@@ -889,11 +891,16 @@ class Sequence(TimeStampedModel):
         if not self.active:
             raise ValueError(f"La secuencia {self.code} no está activa")
         
-        next_number = self.number_next
-        self.number_next += self.number_increment
-        self.save(update_fields=['number_next', 'updated_at'])
-        
-        return next_number
+        with transaction.atomic():
+            # Re-lock el objeto para asegurar atomicidad
+            sequence = Sequence.objects.select_for_update().get(id=self.id)
+            next_number = sequence.number_next
+            
+            # Incrementar
+            sequence.number_next += sequence.number_increment
+            sequence.save(update_fields=['number_next', 'updated_at'])
+            
+            return next_number
     
     def format_number(self, number):
         """Formatea el número según el prefijo, sufijo y padding"""
@@ -912,4 +919,46 @@ class Sequence(TimeStampedModel):
         """Obtiene el próximo número formateado (equivalente a next_by_code de Odoo)"""
         next_number = self.get_next_number()
         return self.format_number(next_number)
+    
+    def get_last_used_number(self):
+        """Obtiene el último número usado basado en facturas existentes"""
+        from .models import AccountMove, InvoiceSerie
+        
+        try:
+            # Buscar la serie asociada a esta secuencia
+            serie = InvoiceSerie.objects.get(sequence=self)
+            print(f"    🔍 Buscando última factura para la {serie.name} - {serie.series} | id: {serie.id}")
+            # Buscar la última factura con esta serie
+            last_invoice = AccountMove.objects.filter(
+                serie=serie,
+                invoice_number__isnull=False
+            ).exclude(invoice_number='').order_by('-id').first()
+            
+            if last_invoice and last_invoice.invoice_number:
+                # Extraer el número de la referencia
+                ref_number = last_invoice.invoice_number
+                if self.prefix and ref_number.startswith(self.prefix):
+                    ref_number = ref_number[len(self.prefix):]
+                
+                # Limpiar y convertir a número
+                import re
+                numbers_only = re.sub(r'\D', '', ref_number)
+                if numbers_only:
+                    return int(numbers_only)
+            
+        except (InvoiceSerie.DoesNotExist, AccountMove.DoesNotExist, ValueError):
+            pass
+        
+        return None
+    
+    def sync_with_existing_invoices(self):
+        """Sincroniza la secuencia con las facturas existentes"""
+        last_used = self.get_last_used_number()
+        print(f"🔄 Secuencia {self.code}: último usado {last_used}")
+        if last_used is not None:
+            # Establecer el próximo número como el último usado + incremento
+            self.number_next = last_used + self.number_increment
+            self.save()
+            return True
+        return False
 
