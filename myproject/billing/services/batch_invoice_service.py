@@ -5,10 +5,10 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Q
 from decimal import Decimal
-
+from .sequence_service import get_next_invoice_reference, get_document_type
 from ..models import (
     SaleSubscription, AccountMove, AccountMoveLine, InvoiceSerie,
-    Product, Tax, Company, Currency, Journal, Partner
+    Product, Tax, Company, Currency, Journal, Partner, Sequence
 )
 
 logger = logging.getLogger(__name__)
@@ -131,23 +131,41 @@ class BatchInvoiceService:
             state__in=['draft', 'posted']
         ).exists()
     
+    def _calculate_due_date(self, invoice_date, subscription):
+        """Método AÑADIDO: Calcular fecha de vencimiento"""
+        from datetime import timedelta
+        # Lógica simple: 30 días después por defecto
+        return invoice_date + timedelta(days=30)
+    
     def _create_invoice_from_subscription(self, subscription, target_date):
-        """
-        Crea la cabecera de la factura desde la suscripción
-        """
-        # Obtener serie de facturación
-        invoice_serie = InvoiceSerie.objects.filter(
-            company=subscription.company,
-            is_active=True
-        ).first()
+        """Crear factura o boleta según el tipo de partner"""
+
+        try:
+            # CORRECCIÓN: Usar función corregida
+            reference = get_next_invoice_reference(subscription.company, subscription.partner)
+            
+        except Exception as e:
+            logger.error(f"Error generando referencia: {str(e)}")
+            # Fallback mejorado
+            doc_type = get_document_type(subscription.partner)
+            series_code = 'F001' if doc_type == 'invoice' else 'B001'
+        
+        # Obtener la secuencia directamente
+        sequence_code = f'account.move.{doc_type}.{subscription.company.id}'
+        try:
+            sequence = Sequence.objects.get(code=sequence_code, company=subscription.company)
+            reference = f"{series_code}-{str(sequence.number_next).zfill(sequence.padding)}"
+        except Sequence.DoesNotExist:
+            # Último recurso
+            reference = f"{series_code}-{subscription.id:08d}"
+            
+        document_type = get_document_type(subscription.partner)
+        invoice_serie = self._get_invoice_serie(subscription.company, document_type)
         
         if not invoice_serie:
-            raise ValueError(f"No hay serie de facturación para {subscription.company}")
-        
-        # Crear referencia simple (sin secuencia por ahora)
-        reference = f"F{subscription.company.id:02d}-{subscription.id}-{target_date.strftime('%Y%m')}"
-        
-        # Crear factura
+            invoice_serie = self._create_fallback_serie(subscription.company, document_type)
+            
+        # Crear documento
         invoice = AccountMove.objects.create(
             partner=subscription.partner,
             subscription=subscription,
@@ -157,15 +175,102 @@ class BatchInvoiceService:
             type='out_invoice',
             state='draft',
             invoice_date=target_date,
-            invoice_date_due=target_date + timedelta(days=30),
+            invoice_date_due=self._calculate_due_date(target_date, subscription),  # CORREGIDO
             serie=invoice_serie,
             invoice_number=reference,
             ref=f"{subscription.code}-{target_date.strftime('%Y%m')}",
-            narration=f"Factura recurrente - {subscription.description or 'Suscripción'}",
-            billing_type='subscription'
+            narration=f"{'Factura' if document_type == 'invoice' else 'Boleta'} recurrente - {subscription.description or 'Suscripción'}",
+            billing_type='subscription',
+            document_type=subscription.partner.document_type or 'dni'
         )
         
+        doc_type_name = 'Factura' if subscription.partnerdocument_type == 'invoice' else 'Boleta'
+        logger.info(f"📄 {doc_type_name} {reference} creada para {subscription.code}")
         return invoice
+    
+    def _get_invoice_serie(self, company, document_type):
+        """Obtener serie según tipo de documento"""
+        series_code = 'F001' if document_type == 'invoice' else 'B001'
+    
+        try:
+            serie = InvoiceSerie.objects.filter(
+                company=company,
+                is_active=True,
+                series=series_code  # Buscar exactamente F001 o B001
+            ).first()
+            
+            if not serie:
+                logger.warning(f"No se encontró serie {series_code} para {company.name}")
+            
+            return serie
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo serie: {str(e)}")
+            return None
+    
+    def _create_fallback_serie(self, company, document_type):
+        """Crear serie de fallback si no existe"""
+        from ..models import Journal, Sequence
+        
+        series_code = 'F001' if document_type == 'invoice' else 'B001'
+        sequence_code = f'account.move.{document_type}.{company.id}'
+        
+        # Buscar secuencia existente primero
+        sequence = Sequence.objects.filter(
+            code=sequence_code,
+            company=company
+        ).first()
+        
+        if not sequence:
+            # Crear secuencia si no existe
+            sequence = Sequence.objects.create(
+                code=sequence_code,
+                company=company,
+                name=f'Secuencia {series_code} - {company.name}',
+                prefix=f'{series_code}-',
+                number_next=1,
+                number_increment=1,
+                padding=8,
+                active=True
+            )
+            logger.info(f"📝 Secuencia creada: {sequence_code} para {company.name}")
+        
+        # Buscar diario existente
+        journal_code = f'VNT{"F" if document_type == "invoice" else "B"}_{company.id}'
+        journal = Journal.objects.filter(
+            code=journal_code,
+            company=company
+        ).first()
+        
+        if not journal:
+            # Crear diario si no existe
+            journal_type_name = 'Facturas' if document_type == 'invoice' else 'Boletas'
+            journal = Journal.objects.create(
+                code=journal_code,
+                company=company,
+                name=f'Diario Ventas {journal_type_name} - {company.name}',
+                type='sale'
+            )
+            logger.info(f"📔 Diario creado: {journal_code} para {company.name}")
+        
+        # Crear serie
+        serie, created = InvoiceSerie.objects.get_or_create(
+            series=series_code,
+            company=company,
+            defaults={
+                'name': f'Serie {series_code} - {company.name}',
+                'journal': journal,
+                'sequence': sequence,
+                'is_active': True
+            }
+        )
+        
+        if created:
+            logger.info(f"📄 Serie de fallback creada: {series_code} para {company.name}")
+        else:
+            logger.info(f"📄 Serie existente encontrada: {series_code} para {company.name}")
+        
+        return serie
     
     def _create_invoice_lines(self, invoice, subscription):
         """
@@ -283,3 +388,42 @@ def validate_subscription_invoiceability(subscription_id):
         
     except SaleSubscription.DoesNotExist:
         return {'can_invoice': False, 'reasons': ['Suscripción no encontrada'], 'estimated_total': Decimal('0')}
+    
+def check_company_setup(company_id):
+    """Verificar que una compañía tenga la configuración necesaria"""
+    from ..models import Company, InvoiceSerie
+    
+    company = Company.objects.get(id=company_id)
+    
+    setup_info = {
+        'company': company.name,
+        'has_invoice_serie': False,
+        'has_ticket_serie': False,
+        'series_details': []
+    }
+    
+    # Verificar series F001
+    invoice_series = InvoiceSerie.objects.filter(company=company, series='F001', is_active=True)
+    for serie in invoice_series:
+        setup_info['has_invoice_serie'] = True
+        setup_info['series_details'].append({
+            'series': serie.series,
+            'type': 'Factura',
+            'journal': serie.journal.name if serie.journal else 'No asignado',
+            'sequence': serie.sequence.code if serie.sequence else 'No asignado'
+        })
+    
+    # Verificar series B001
+    ticket_series = InvoiceSerie.objects.filter(company=company, series='B001', is_active=True)
+    for serie in ticket_series:
+        setup_info['has_ticket_serie'] = True
+        setup_info['series_details'].append({
+            'series': serie.series,
+            'type': 'Boleta',
+            'journal': serie.journal.name if serie.journal else 'No asignado',
+            'sequence': serie.sequence.code if serie.sequence else 'No asignado'
+        })
+    
+    setup_info['is_configured'] = setup_info['has_invoice_serie'] and setup_info['has_ticket_serie']
+    
+    return setup_info

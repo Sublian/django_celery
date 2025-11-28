@@ -17,19 +17,12 @@ class Command(BaseCommand):
             type=int,
             help='ID de suscripción específica'
         )
-        parser.add_argument(
-            '--limit',
-            type=int,
-            default=2,
-            help='Límite de facturas a crear (default: 2)'
-        )
     
     def handle(self, *args, **options):
         self.stdout.write('🧪 Creando facturas reales de prueba...')
         
         company_id = options.get('company')
         subscription_id = options.get('subscription')
-        limit = options.get('limit')
         
         # Configurar IDs específicos si se proporcionan
         subscription_ids = None
@@ -40,9 +33,7 @@ class Command(BaseCommand):
         service = BatchInvoiceService(company_id=company_id, dry_run=False)
         result = service.generate_batch_invoices(
             target_date=None,
-            subscription_ids=subscription_ids,
-            limit=limit
-        )
+            subscription_ids=subscription_ids)
         
         self.stdout.write("📊 RESULTADOS REALES:")
         self.stdout.write(f"   Procesadas: {result['processed']}")

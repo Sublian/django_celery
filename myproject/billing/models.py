@@ -453,7 +453,7 @@ class AccountMove(TimeStampedModel):
     )
     amount_tax = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     amount_total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
-    invoice_origin = models.CharField(max_length=128, null=True, blank=True, Help_text="Referencia de la factura original")
+    invoice_origin = models.CharField(max_length=128, null=True, blank=True)
     xml_version = models.FileField(upload_to="invoices/xml/", null=True, blank=True)
     qr_code = models.URLField(null=True, blank=True)
     

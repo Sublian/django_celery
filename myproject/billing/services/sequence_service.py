@@ -47,9 +47,29 @@ class SequenceService:
             logger.error(f"Secuencia no encontrada: {sequence_code} para compañía {company}")
             raise
         
+    def get_document_type(self, partner):
+        """
+        Determina si es factura o boleta basado en el partner
+        """
+        # Factura: RUC con 11 dígitos
+        # Boleta: DNI, CE, Pasaporte, etc.
+        if (partner.document_type == 'ruc' and 
+            partner.num_document and 
+            len(partner.num_document) == 11):
+            return 'invoice'  # Factura
+        else:
+            return 'ticket'   # Boleta
+        
+    def get_sequence_for_partner(self, company, partner):
+        """
+        Obtiene la secuencia apropiada para un partner
+        """
+        document_type = self.get_document_type(partner)
+        return self.get_sequence(company, document_type)
+    
     def generate_next_reference(self, sequence_type, company, document_type=None):
         """
-        Genera la próxima referencia
+        Genera la próxima referencia - VERSIÓN CORREGIDA
         """
         sequence = self.get_sequence(sequence_type, company, document_type)
         
@@ -137,3 +157,7 @@ def validate_sequences(company_id=None):
     """Valida consistencia de secuencias"""
     service = SequenceService()
     return service.validate_sequence_consistency(company_id)
+
+def get_document_type(partner):
+    service = SequenceService()
+    return service.get_document_type(partner)
