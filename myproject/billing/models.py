@@ -6,6 +6,8 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 from datetime import timedelta
+import calendar
+import re
         
 import logging
 
@@ -69,6 +71,11 @@ class Partner(TimeStampedModel):
         blank=True,
         verbose_name="Término de Pago por Defecto",
         help_text="Término de pago predeterminado para este cliente"
+    )
+    invoice_end_of_month_payment = models.BooleanField(
+        default=False,
+        verbose_name="Pago Factura Fin de Mes",
+        help_text="Las facturas de este cliente tienen vencimiento a fin de mes (30/28 días)"
     )
     
     def __str__(self): 
@@ -390,6 +397,16 @@ class SaleSubscription(TimeStampedModel):
     def __str__(self):
         return f"Sub #{self.id} - {self.partner.name}"
     
+    def inherits_end_of_month_payment(self):
+        """Determina si la suscripción hereda la configuración de pago a fin de mes"""
+        # 1. Primero del partner
+        if self.partner and hasattr(self.partner, 'invoice_end_of_month_payment'):
+            return self.partner.invoice_end_of_month_payment
+        
+        # 2. Luego de la plantilla de contrato (si existiera esa configuración)
+        # Por ahora, solo del partner
+        return False
+    
     def calculate_next_invoice_date(self):
         """Calcula la próxima fecha de facturación basada en la plantilla"""
         if self.contract_template and self.date_start:
@@ -555,30 +572,28 @@ class AccountMove(TimeStampedModel):
     def __str__(self): 
         return f"Invoice #{self.invoice_number or self.id}"
     
-    def save(self, *args, **kwargs):
-        """Sobrescribir save para establecer término de pago automáticamente si viene de suscripción"""
-        # Si es una factura de suscripción y no tiene término de pago asignado
-        if self.subscription and not self.invoice_payment_term:
-            payment_term = self.subscription.get_payment_term()
-            if payment_term:
-                self.invoice_payment_term = payment_term
+    @property
+    def invoice_end_of_month_payment(self):
+        """Propiedad que determina si la factura tiene pago a fin de mes"""
+        # 1. Primero verificar si el partner tiene la configuración
+        if self.partner and hasattr(self.partner, 'invoice_end_of_month_payment'):
+            return self.partner.invoice_end_of_month_payment
         
-        # Calcular fecha de vencimiento basada en el término de pago
-        if self.invoice_payment_term and self.invoice_date and not self.invoice_date_due:
-            self.invoice_date_due = self.calculate_due_date()
+        # 2. Si es factura de suscripción, verificar si la suscripción hereda del partner
+        if self.subscription:
+            return self.subscription.inherits_end_of_month_payment()
         
-        super().save(*args, **kwargs)
+        return False
     
     def calculate_due_date(self):
         """Calcula la fecha de vencimiento basada en el término de pago"""
-        if not self.invoice_payment_term:
+        if not self.invoice_payment_term or not self.invoice_date:
             return None
         
         # Buscar la primera línea del término de pago
         payment_line = self.invoice_payment_term.lines.first()
         if not payment_line:
             return None
-        
         
         due_date = self.invoice_date
         
@@ -589,23 +604,108 @@ class AccountMove(TimeStampedModel):
         elif payment_line.option == 'day_following_month':
             # Día específico del mes siguiente
             if payment_line.day_of_the_month:
-                # Ir al siguiente mes y establecer el día específico
                 next_month = self.invoice_date.replace(day=1) + relativedelta(months=1)
                 try:
                     due_date = next_month.replace(day=payment_line.day_of_the_month)
                 except ValueError:
-                    # Si el día no existe en ese mes (ej: 31 en febrero), usar último día
-                    from calendar import monthrange
-                    last_day = monthrange(next_month.year, next_month.month)[1]
+                    # Si el día no existe en ese mes, usar último día
+                    last_day = calendar.monthrange(next_month.year, next_month.month)[1]
                     due_date = next_month.replace(day=min(payment_line.day_of_the_month, last_day))
         
         elif payment_line.option == 'end_of_month':
-            # Fin del mes actual
-            from calendar import monthrange
-            last_day = monthrange(self.invoice_date.year, self.invoice_date.month)[1]
-            due_date = self.invoice_date.replace(day=last_day)
+            # Fin del mes actual - USAR LÓGICA ESPECIAL 30/28
+            due_date = self._calculate_end_of_month_due_date()
         
-        return due_date
+        # Verificar que la fecha de vencimiento no sea menor o igual a la emisión
+        if due_date <= self.invoice_date:
+            # Mover al siguiente periodo según el tipo de término
+            if payment_line.option == 'end_of_month':
+                # Para fin de mes, usar el siguiente mes
+                due_date = self._get_next_end_of_month(due_date)
+            else:
+                # Para otros tipos, agregar más días
+                due_date = due_date + timedelta(days=1)
+        
+        return due_date    
+    
+    def _calculate_end_of_month_due_date(self):
+        """Calcula fecha de vencimiento para fin de mes con regla 30/28"""
+        
+        # Determinar el mes de vencimiento
+        if self.invoice_end_of_month_payment:
+            # Si es factura fin de mes, verificar condiciones especiales
+            return self._calculate_end_of_month_with_hotfix()
+        else:
+            # Fin de mes normal (último día del mes)
+            last_day = calendar.monthrange(self.invoice_date.year, self.invoice_date.month)[1]
+            return self.invoice_date.replace(day=last_day)
+        
+    def _calculate_end_of_month_with_hotfix(self):
+        """Aplica la lógica de hotfix 30/28 días"""
+        
+        # Obtener último día natural del mes
+        _, num_dias_en_mes = calendar.monthrange(self.invoice_date.year, self.invoice_date.month)
+        ultimo_dia_mes = self.invoice_date.replace(day=num_dias_en_mes)
+        
+        # Determinar día de cierre (30 o 28)
+        mes = self.invoice_date.month
+        dia_de_cierre = 28 if mes == 2 else 30
+        
+        # Intentar establecer el día de cierre
+        try:
+            fecha_vencimiento_original = self.invoice_date.replace(day=dia_de_cierre)
+        except ValueError:
+            # Si el día no existe (ej: 30 en febrero), usar último día
+            fecha_vencimiento_original = ultimo_dia_mes
+        
+        # Verificar condiciones para aplicar hotfix
+        condicion_a_ultimo_dia = (self.invoice_date.day == num_dias_en_mes)
+        condicion_b_dia_30_en_mes_31 = (self.invoice_date.day == 30 and num_dias_en_mes == 31)
+        condicion_c_es_28_feb_en_bisiesto = (
+            self.invoice_date.month == 2 and 
+            self.invoice_date.day == 28 and 
+            num_dias_en_mes == 29  # Año bisiesto
+        )
+        
+        # Aplicar hotfix si se cumple alguna condición
+        if condicion_a_ultimo_dia or condicion_b_dia_30_en_mes_31 or condicion_c_es_28_feb_en_bisiesto:
+            return self._get_next_end_of_month(self.invoice_date)
+        else:
+            return fecha_vencimiento_original
+        
+    def _get_next_end_of_month(self, fecha_base):
+        """Obtiene el 30/28 del mes siguiente"""
+        
+        # Calcular primer día del mes siguiente
+        primer_dia_mes_siguiente = (fecha_base.replace(day=1) + relativedelta(months=1))
+        
+        # Determinar día de cierre para el mes siguiente
+        mes_siguiente = primer_dia_mes_siguiente.month
+        dia_de_cierre = 28 if mes_siguiente == 2 else 30
+        
+        # Intentar establecer el día de cierre
+        try:
+            return primer_dia_mes_siguiente.replace(day=dia_de_cierre)
+        except ValueError:
+            # Si el día no existe (ej: 30 en febrero), usar último día
+            last_day = calendar.monthrange(primer_dia_mes_siguiente.year, mes_siguiente)[1]
+            return primer_dia_mes_siguiente.replace(day=last_day)
+    
+    def save(self, *args, **kwargs):
+        """Sobrescribir save para calcular automáticamente fecha de vencimiento"""
+
+        # Si es una factura de suscripción y no tiene término de pago asignado
+        if self.subscription and not self.invoice_payment_term:
+            payment_term = self.subscription.get_payment_term()
+            if payment_term:
+                self.invoice_payment_term = payment_term
+        
+        # Calcular fecha de vencimiento si no existe
+        if self.invoice_payment_term and self.invoice_date and not self.invoice_date_due:
+            self.invoice_date_due = self.calculate_due_date()
+        
+        super().save(*args, **kwargs)
+    
 
 class AccountMoveLine(TimeStampedModel):
     move = models.ForeignKey(AccountMove, related_name="lines", on_delete=models.CASCADE)
@@ -1041,7 +1141,6 @@ class Sequence(TimeStampedModel):
     
     def get_last_used_number(self):
         """Obtiene el último número usado basado en facturas existentes"""
-        from .models import AccountMove, InvoiceSerie
         
         try:
             # Buscar la serie asociada a esta secuencia
@@ -1060,7 +1159,7 @@ class Sequence(TimeStampedModel):
                     ref_number = ref_number[len(self.prefix):]
                 
                 # Limpiar y convertir a número
-                import re
+                
                 numbers_only = re.sub(r'\D', '', ref_number)
                 if numbers_only:
                     return int(numbers_only)
