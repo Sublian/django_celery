@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from billing.models import (
     SaleSubscription, SaleSubscriptionLine, Partner, Company, 
-    Product, Tax, ContractTemplate
+    Product, Tax, ContractTemplate, AccountPaymentTerm
 )
 from billing.services.sequence_service import get_next_subscription_code
 from decimal import Decimal
@@ -58,7 +58,7 @@ class Command(BaseCommand):
             
              # Obtener partners de esta compañía usando la relación ManyToMany
             company_partners = Partner.objects.filter(
-                companies=company, 
+                company=company, 
                 is_customer=True, 
                 is_active=True
             )[:max_per_company] # Limitar al máximo por compañía
@@ -98,6 +98,21 @@ class Command(BaseCommand):
 
     def _create_subscription(self, partner, company, template, products, taxes, subscription_code):
         """Crear una suscripción individual con código secuencial"""
+        
+        # Obtener término de pago (jerarquía: template → partner → default)
+        payment_term = None
+        if template.payment_term:
+            payment_term = template.payment_term
+        elif partner.payment_term:
+            payment_term = partner.payment_term
+        else:
+            # Buscar término por defecto de la compañía
+            default_term = AccountPaymentTerm.objects.filter(
+                company=company,
+                is_active=True
+            ).first()
+            if default_term:
+                payment_term = default_term
 
         date_start = timezone.now().date() - timedelta(days=random.randint(0, 60))
         date_end = self._calculate_end_date(date_start, template)
@@ -107,6 +122,7 @@ class Command(BaseCommand):
             partner=partner,
             company=company,
             contract_template=template,
+            payment_term=payment_term, 
             date_start=date_start,
             date_end=date_end,
             recurring_total=Decimal('0'),
@@ -157,31 +173,38 @@ class Command(BaseCommand):
             return start_date + relativedelta(years=1)
     
     def _calculate_next_invoice_date(self, start_date, template):
-        """Calcular próxima fecha de facturación - VERSIÓN MEJORADA"""
+        """Calcular próxima fecha de facturación de forma consistente"""
         today = timezone.now().date()
         
-        # Si la fecha de inicio es futura, usar esa fecha
+        # Si el contrato empieza en el futuro
         if start_date > today:
             return start_date
         
-        # Para suscripciones aprobadas y recurrentes, usar primer día del siguiente mes
-        if template.payment_mode != 'manual':  # Si es automático
+        # Calcular basado en la regla de recurrencia
+        if template.recurring_rule_type == 'daily':
+            # Encontrar el próximo ciclo desde hoy
+            days_since_start = (today - start_date).days
+            cycles_passed = days_since_start // template.recurring_interval
+            next_cycle = cycles_passed + 1
+            return start_date + timedelta(days=next_cycle * template.recurring_interval)
+            
+        elif template.recurring_rule_type == 'weekly':
+            weeks_since_start = (today - start_date).days // 7
+            cycles_passed = weeks_since_start // template.recurring_interval
+            next_cycle = cycles_passed + 1
+            return start_date + timedelta(weeks=next_cycle * template.recurring_interval)
+            
+        elif template.recurring_rule_type == 'monthly':
+            # Primer día del mes siguiente
             next_month = today.replace(day=1) + relativedelta(months=1)
             return next_month
-        
-        # Lógica según tipo de recurrencia
-        if template.recurring_rule_type == 'daily':
-            return today + timedelta(days=template.recurring_interval)
-        elif template.recurring_rule_type == 'weekly':
-            return today + timedelta(weeks=template.recurring_interval)
-        elif template.recurring_rule_type == 'monthly':
-            # Primer día del siguiente mes para consistencia
-            return today.replace(day=1) + relativedelta(months=1)
+            
         elif template.recurring_rule_type == 'yearly':
             return today + relativedelta(years=template.recurring_interval)
-        else:
-            # Por defecto: primer día del siguiente mes
-            return today.replace(day=1) + relativedelta(months=1)    
+        
+        # Por defecto
+        return today.replace(day=1) + relativedelta(months=1)
+
     def _create_subscription_lines(self, subscription, products, taxes):
         """Crear líneas de suscripción y retornar total mensual"""
         total_monthly = Decimal('0')

@@ -5,6 +5,8 @@ from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
+from datetime import timedelta
+        
 import logging
 
 logger = logging.getLogger(__name__)
@@ -59,6 +61,15 @@ class Partner(TimeStampedModel):
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Empresa Relacionada", related_name="children")
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Usuario Asociado", related_name='partner_profile')
     companies = models.ManyToManyField('Company', blank=True, related_name='partners', verbose_name="Compañías Asociadas")
+    # === NUEVO CAMPO: Término de pago por defecto ===
+    payment_term = models.ForeignKey(
+        'AccountPaymentTerm',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Término de Pago por Defecto",
+        help_text="Término de pago predeterminado para este cliente"
+    )
     
     def __str__(self): 
         return self.name
@@ -280,6 +291,7 @@ class AccountPaymentTermLine(TimeStampedModel):
         ('fixed', 'Monto Fijo'),
     ], default='balance')
     value_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    note = models.TextField(blank=True, null=True)
     
     class Meta:
         ordering = ['sequence']
@@ -353,6 +365,16 @@ class SaleSubscription(TimeStampedModel):
         related_name='subscriptions',
         verbose_name="Plantilla de Contrato"
     )
+    # === NUEVO CAMPO: Término de pago específico ===
+    payment_term = models.ForeignKey(
+        'AccountPaymentTerm',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Término de Pago",
+        help_text="Término de pago específico para esta suscripción"
+    )
+    
     # === CAMPOS DE SEGUIMIENTO ===
     invoices_generated = models.IntegerField(default=0, verbose_name="Facturas Generadas")
     total_invoiced = models.DecimalField(max_digits=18, decimal_places=2, default=0, verbose_name="Total Facturado")
@@ -379,6 +401,24 @@ class SaleSubscription(TimeStampedModel):
         if not self.next_invoice_date and self.contract_template:
             self.next_invoice_date = self.calculate_next_invoice_date()
         super().save(*args, **kwargs)
+        
+    def get_payment_term(self):
+        """Obtiene el término de pago aplicable (jerarquía)"""
+        # 1. Término específico de la suscripción
+        if self.payment_term:
+            return self.payment_term
+        
+        # 2. Término de la plantilla de contrato
+        if self.contract_template and self.contract_template.payment_term:
+            return self.contract_template.payment_term
+        
+        # 3. Término por defecto del cliente
+        if self.partner.payment_term:
+            return self.partner.payment_term
+        
+        # 4. Término por defecto de la compañía (si existiera)
+        # Por ahora, retornar None
+        return None
 
 class SaleSubscriptionLine(TimeStampedModel):
     subscription = models.ForeignKey(SaleSubscription, related_name="lines", on_delete=models.CASCADE)
@@ -455,7 +495,9 @@ class AccountMove(TimeStampedModel):
         AccountPaymentTerm, 
         on_delete=models.SET_NULL, 
         blank=True, 
-        null=True
+        null=True,
+        verbose_name="Término de Pago",
+        help_text="Término de pago aplicado a esta factura"
     )
     amount_tax = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     amount_total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
@@ -512,6 +554,58 @@ class AccountMove(TimeStampedModel):
     
     def __str__(self): 
         return f"Invoice #{self.invoice_number or self.id}"
+    
+    def save(self, *args, **kwargs):
+        """Sobrescribir save para establecer término de pago automáticamente si viene de suscripción"""
+        # Si es una factura de suscripción y no tiene término de pago asignado
+        if self.subscription and not self.invoice_payment_term:
+            payment_term = self.subscription.get_payment_term()
+            if payment_term:
+                self.invoice_payment_term = payment_term
+        
+        # Calcular fecha de vencimiento basada en el término de pago
+        if self.invoice_payment_term and self.invoice_date and not self.invoice_date_due:
+            self.invoice_date_due = self.calculate_due_date()
+        
+        super().save(*args, **kwargs)
+    
+    def calculate_due_date(self):
+        """Calcula la fecha de vencimiento basada en el término de pago"""
+        if not self.invoice_payment_term:
+            return None
+        
+        # Buscar la primera línea del término de pago
+        payment_line = self.invoice_payment_term.lines.first()
+        if not payment_line:
+            return None
+        
+        
+        due_date = self.invoice_date
+        
+        if payment_line.option == 'day_after_invoice_date':
+            # Días después de la fecha de factura
+            due_date = self.invoice_date + timedelta(days=payment_line.days)
+        
+        elif payment_line.option == 'day_following_month':
+            # Día específico del mes siguiente
+            if payment_line.day_of_the_month:
+                # Ir al siguiente mes y establecer el día específico
+                next_month = self.invoice_date.replace(day=1) + relativedelta(months=1)
+                try:
+                    due_date = next_month.replace(day=payment_line.day_of_the_month)
+                except ValueError:
+                    # Si el día no existe en ese mes (ej: 31 en febrero), usar último día
+                    from calendar import monthrange
+                    last_day = monthrange(next_month.year, next_month.month)[1]
+                    due_date = next_month.replace(day=min(payment_line.day_of_the_month, last_day))
+        
+        elif payment_line.option == 'end_of_month':
+            # Fin del mes actual
+            from calendar import monthrange
+            last_day = monthrange(self.invoice_date.year, self.invoice_date.month)[1]
+            due_date = self.invoice_date.replace(day=last_day)
+        
+        return due_date
 
 class AccountMoveLine(TimeStampedModel):
     move = models.ForeignKey(AccountMove, related_name="lines", on_delete=models.CASCADE)
@@ -775,6 +869,15 @@ class ContractTemplate(TimeStampedModel):
     #     blank=True,
     #     verbose_name="Plantilla de Email para Factura"
     # )
+    # === NUEVO CAMPO: Término de pago por defecto ===
+    payment_term = models.ForeignKey(
+        'AccountPaymentTerm',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Término de Pago por Defecto",
+        help_text="Término de pago predeterminado para contratos con esta plantilla"
+    )
     
     # === METADATOS ===
     created_by = models.ForeignKey(
