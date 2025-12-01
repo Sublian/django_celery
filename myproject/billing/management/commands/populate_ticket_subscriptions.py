@@ -7,6 +7,7 @@ from billing.models import (
     SaleSubscription, SaleSubscriptionLine, Partner, Company, 
     Product, Tax, ContractTemplate
 )
+from billing.services.sequence_service import get_next_subscription_code
 from decimal import Decimal
 import random
 
@@ -40,11 +41,11 @@ class Command(BaseCommand):
         
         # Datos de prueba para clientes con DNI/CE (boletas)
         ticket_customers = [
+            {'name': 'Ana Martínez', 'document_type': 'ce', 'num_document': '28973456'},
+            {'name': 'Luis Fernández', 'document_type': 'dni', 'num_document': '46769636'},
             {'name': 'Juan Pérez López', 'document_type': 'dni', 'num_document': '46789231'},
             {'name': 'María García Soto', 'document_type': 'dni', 'num_document': '53216789'},
-            {'name': 'Carlos Rodríguez', 'document_type': 'ce', 'num_document': 'AX539827'},
-            {'name': 'Ana Martínez', 'document_type': 'dni', 'num_document': '28973456'},
-            {'name': 'Luis Fernández', 'document_type': 'pasaporte', 'num_document': 'PE284736'},
+            {'name': 'Carlos Rodríguez', 'document_type': 'ce', 'num_document': '00539827'},
         ]
         
         total_created = 0
@@ -84,7 +85,8 @@ class Command(BaseCommand):
                     template = random.choice(list(company_templates))
                     
                     # Crear código único
-                    subscription_code = f"SUB{company.id:02d}-{partner.id:06d}"
+                    # subscription_code = f"SUB{company.id:02d}-{partner.id:06d}"
+                    subscription_code = get_next_subscription_code(company)
                     
                     subscription = self._create_subscription(
                         partner, company, template, products, taxes, subscription_code

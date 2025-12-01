@@ -112,7 +112,7 @@ class Command(BaseCommand):
         companies = Company.objects.all()
         
         for company in companies:
-            self.stdout.write(f"📋 Creando series para: {company}")
+            self.stdout.write(f"📋 Creando series Journal para: {company}")
             
             # Obtener diarios y secuencias de esta compañía
             journal_factura = Journal.objects.filter(

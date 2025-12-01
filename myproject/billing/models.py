@@ -5,6 +5,9 @@ from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
@@ -329,6 +332,9 @@ class SaleSubscription(TimeStampedModel):
     health = models.CharField(max_length=20, default="normal", help_text="Estado de salud de la suscripción")
     to_renew = models.BooleanField(default=True, help_text="Indica si la suscripción debe renovarse automáticamente")
     is_active = models.BooleanField(default=True, help_text="Indica si la suscripción está activa")
+    is_pu = models.BooleanField(default=False, help_text="Indica si la suscripción es de tipo PU")
+    is_recurring = models.BooleanField(default=True, help_text="Indica si la suscripción es recurrente")
+    is_approved = models.BooleanField(default=False, help_text="Indica si la suscripción ha sido aprobada")
     
     # === NUEVOS CAMPOS ===
     next_invoice_date = models.DateField(null=True, blank=True, help_text="Próxima fecha programada para facturación")
@@ -405,9 +411,9 @@ class AccountMove(TimeStampedModel):
     ref = models.CharField(max_length=200, blank=True, null=True)
     name = models.CharField(max_length=200, blank=True, null=True)
     file_name = models.CharField(max_length=200, null=True, blank=True)
-    narration = models.TextField(blank=True, null=True)
-    invoice_date = models.DateField(default=timezone.now)
-    invoice_date_due = models.DateField(blank=True, null=True)
+    narration = models.TextField(blank=True, null=True, help_text="Notas o Comentarios de la Factura")
+    invoice_date = models.DateField(default=timezone.now, help_text="Fecha de Emisión de la Factura")
+    invoice_date_due = models.DateField(blank=True, null=True, help_text="Fecha de Vencimiento de la Factura")
     hash_code = models.CharField(max_length=64, null=True, blank=True)
     print_version = models.IntegerField(default=1)
     billing_type = models.CharField(max_length=20,blank=True, null=True)
@@ -500,6 +506,8 @@ class AccountMove(TimeStampedModel):
             models.Index(fields=['invoice_date']),
             models.Index(fields=['state']),
             models.Index(fields=['sunat_state']),
+            models.Index(fields=['company', 'invoice_number']),
+            models.Index(fields=['serie', 'invoice_number']),
         ]
     
     def __str__(self): 
@@ -887,18 +895,26 @@ class Sequence(TimeStampedModel):
         return f"{self.name} ({self.code})"
     
     def get_next_number(self):
-        """Obtiene el próximo número de la secuencia y lo incrementa"""
+        """Obtiene el próximo número de la secuencia y lo incrementa - Mejorado"""
         if not self.active:
             raise ValueError(f"La secuencia {self.code} no está activa")
         
         with transaction.atomic():
             # Re-lock el objeto para asegurar atomicidad
-            sequence = Sequence.objects.select_for_update().get(id=self.id)
+            sequence = Sequence.objects.select_for_update(
+                of=('self',)  # Solo bloquea esta tabla
+            ).get(id=self.id)
             next_number = sequence.number_next
+            
+            if next_number < 1:
+                raise ValueError(f"Número siguiente inválido ({next_number}) en la secuencia {self.code}")
             
             # Incrementar
             sequence.number_next += sequence.number_increment
             sequence.save(update_fields=['number_next', 'updated_at'])
+            
+             # Refrescar para obtener el valor actualizado
+            sequence.refresh_from_db()
             
             return next_number
     
@@ -927,7 +943,7 @@ class Sequence(TimeStampedModel):
         try:
             # Buscar la serie asociada a esta secuencia
             serie = InvoiceSerie.objects.get(sequence=self)
-            print(f"    🔍 Buscando última factura para la {serie.name} - {serie.series} | id: {serie.id}")
+
             # Buscar la última factura con esta serie
             last_invoice = AccountMove.objects.filter(
                 serie=serie,
@@ -946,8 +962,12 @@ class Sequence(TimeStampedModel):
                 if numbers_only:
                     return int(numbers_only)
             
-        except (InvoiceSerie.DoesNotExist, AccountMove.DoesNotExist, ValueError):
-            pass
+        except InvoiceSerie.DoesNotExist:
+            logger.warning(f"No se encontró serie para la secuencia {self.code}")
+        except AccountMove.DoesNotExist:
+            logger.debug(f"No hay facturas para la serie de secuencia {self.code}")
+        except (ValueError, IndexError) as e:
+            logger.error(f"Error extrayendo número de referencia para secuencia {self.code}: {e}")
         
         return None
     

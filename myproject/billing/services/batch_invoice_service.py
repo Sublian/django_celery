@@ -1,6 +1,7 @@
 # billing/services/batch_invoice_service.py (versión simplificada)
 import logging
 from datetime import date, timedelta
+from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Q
@@ -8,7 +9,7 @@ from decimal import Decimal
 from .sequence_service import get_next_invoice_reference, get_document_type
 from ..models import (
     SaleSubscription, AccountMove, AccountMoveLine, InvoiceSerie,
-    Product, Tax, Company, Currency, Journal, Partner, Sequence
+    Product, Tax, Company, Currency, Journal, Partner, Sequence, AccountPaymentTerm
 )
 
 logger = logging.getLogger(__name__)
@@ -37,24 +38,24 @@ class BatchInvoiceService:
         target_date = target_date or self.today
         
         if self.dry_run:
-            logger.info(f"🔍 MODO SIMULACIÓN - Facturas a generar para {target_date}")
+            print(f"🔍 MODO SIMULACIÓN - Facturas a generar para {target_date}")
         else:
-            logger.info(f"🚀 Generando facturas para {target_date}")
+            print(f"🚀 Generando facturas para {target_date}")
         
         try:
             # Obtener suscripciones elegibles
             subscriptions = self._get_eligible_subscriptions(target_date, subscription_ids)
-            logger.info(f"📊 Encontradas {len(subscriptions)} suscripciones elegibles")
+            print(f"📊 Encontradas {len(subscriptions)} suscripciones elegibles")
             
             # Procesar cada suscripción
             for subscription in subscriptions:
                 self._process_subscription_invoice(subscription, target_date)
             
-            logger.info(f"✅ Proceso completado: {self.stats}")
+            print(f"✅ Proceso completado: {self.stats}")
             return self.stats
             
         except Exception as e:
-            logger.error(f"❌ Error en generación de facturas: {str(e)}")
+            print(f"❌ Error en generación de facturas: {str(e)}")
             self.stats['errors'] += 1
             return self.stats
     
@@ -116,7 +117,7 @@ class BatchInvoiceService:
                 self.stats['details'].append(f"Factura creada para {subscription.code}")
                 
         except Exception as e:
-            logger.error(f"Error procesando suscripción {subscription.id}: {str(e)}")
+            logger.error(f"<> Error procesando suscripción {subscription.id}: {str(e)}")
             self.stats['errors'] += 1
             self.stats['details'].append(f"Error en {subscription.code}: {str(e)}")
     
@@ -131,11 +132,99 @@ class BatchInvoiceService:
             state__in=['draft', 'posted']
         ).exists()
     
-    def _calculate_due_date(self, invoice_date, subscription):
-        """Método AÑADIDO: Calcular fecha de vencimiento"""
-        from datetime import timedelta
-        # Lógica simple: 30 días después por defecto
-        return invoice_date + timedelta(days=30)
+    def _calculate_emission_date(self, subscription, target_date):
+        """
+        Calcula fecha de emisión según reglas:
+        - Máximo entre fecha_inicio_contrato y fecha_actual
+        - Si es recurrente y aprobada: primer día del siguiente mes
+        """
+        # Fecha base: máximo entre fecha_inicio y fecha_actual
+        emission_date = max(subscription.date_start, target_date)
+        
+        # Si es recurrente y está aprobada, usar primer día del siguiente mes
+        if subscription.is_recurring and subscription.is_approved:
+            # Si no es el primer día del mes, ir al primer día del siguiente mes
+            if emission_date.day > 1:
+                emission_date = (emission_date.replace(day=1) + 
+                               relativedelta(months=1))
+            else:
+                emission_date = emission_date.replace(day=1)
+        
+        return emission_date
+    
+    def _calculate_due_date(self, emission_date, subscription):
+        """
+        Calcula fecha de vencimiento usando términos de pago o lógica por defecto
+        """
+        # Intentar obtener término de pago de la plantilla o usar por defecto
+        payment_term = self._get_payment_term_for_subscription(subscription)
+        
+        if payment_term:
+            return self._calculate_due_date_from_payment_term(emission_date, payment_term)
+        else:
+            # Lógica por defecto: día 30 del mes siguiente
+            return self._calculate_default_due_date(emission_date)
+        
+    def _get_payment_term_for_subscription(self, subscription):
+        """
+        Obtiene el término de pago para la suscripción
+        (Por ahora usamos el primero disponible, luego se puede personalizar)
+        """
+        try:
+            return AccountPaymentTerm.objects.filter(
+                company=subscription.company,
+                is_active=True
+            ).first()
+        except AccountPaymentTerm.DoesNotExist:
+            return None
+        
+    def _calculate_due_date_from_payment_term(self, emission_date, payment_term):
+        """
+        Calcula fecha de vencimiento basada en términos de pago
+        """
+        # Obtener la primera línea del término de pago
+        term_line = payment_term.lines.first()
+        
+        if not term_line:
+            return self._calculate_default_due_date(emission_date)
+        
+        if term_line.option == 'day_after_invoice_date':
+            return emission_date + timedelta(days=term_line.days)
+        
+        elif term_line.option == 'day_following_month':
+            # Día específico del mes siguiente
+            next_month = emission_date + relativedelta(months=1)
+            try:
+                return next_month.replace(day=term_line.day_of_the_month)
+            except ValueError:
+                # Si el día no existe en el mes, usar último día
+                return next_month + relativedelta(day=31)
+        
+        elif term_line.option == 'after_invoice_month':
+            # Después del mes de factura (ej: +45 días)
+            return emission_date + timedelta(days=term_line.days)
+        
+        else:
+            return self._calculate_default_due_date(emission_date)
+        
+    def _calculate_default_due_date(self, emission_date):
+        """
+        Lógica por defecto: día 30 del mes siguiente
+        """
+        next_month = emission_date + relativedelta(months=1)
+        
+        try:
+            # Intentar día 30 del mes siguiente
+            due_date = next_month.replace(day=30)
+        except ValueError:
+            # Si el mes no tiene día 30, usar último día del mes
+            due_date = next_month + relativedelta(day=31)
+        
+        # Validar que vencimiento > emisión
+        if due_date <= emission_date:
+            due_date = self._calculate_default_due_date(emission_date + timedelta(days=1))
+        
+        return due_date        
     
     def _create_invoice_from_subscription(self, subscription, target_date):
         """Crear factura o boleta según el tipo de partner"""
@@ -145,20 +234,8 @@ class BatchInvoiceService:
             reference = get_next_invoice_reference(subscription.company, subscription.partner)
             
         except Exception as e:
-            logger.error(f"Error generando referencia: {str(e)}")
-            # Fallback mejorado
-            doc_type = get_document_type(subscription.partner)
-            series_code = 'F001' if doc_type == 'invoice' else 'B001'
+            logger.error(f"<> Error generando referencia: {str(e)}")
         
-        # Obtener la secuencia directamente
-        sequence_code = f'account.move.{doc_type}.{subscription.company.id}'
-        try:
-            sequence = Sequence.objects.get(code=sequence_code, company=subscription.company)
-            reference = f"{series_code}-{str(sequence.number_next).zfill(sequence.padding)}"
-        except Sequence.DoesNotExist:
-            # Último recurso
-            reference = f"{series_code}-{subscription.id:08d}"
-            
         document_type = get_document_type(subscription.partner)
         invoice_serie = self._get_invoice_serie(subscription.company, document_type)
         
@@ -178,13 +255,13 @@ class BatchInvoiceService:
             invoice_date_due=self._calculate_due_date(target_date, subscription),  # CORREGIDO
             serie=invoice_serie,
             invoice_number=reference,
-            ref=f"{subscription.code}-{target_date.strftime('%Y%m')}",
+            ref=subscription.code,
             narration=f"{'Factura' if document_type == 'invoice' else 'Boleta'} recurrente - {subscription.description or 'Suscripción'}",
             billing_type='subscription',
             document_type=subscription.partner.document_type or 'dni'
         )
         
-        doc_type_name = 'Factura' if subscription.partnerdocument_type == 'invoice' else 'Boleta'
+        doc_type_name = 'Factura' if document_type == 'invoice' else 'Boleta'
         logger.info(f"📄 {doc_type_name} {reference} creada para {subscription.code}")
         return invoice
     
@@ -321,19 +398,22 @@ class BatchInvoiceService:
     
     def _update_subscription_after_invoice(self, subscription, invoice, target_date):
         """
-        Actualiza la suscripción después de generar factura
+        Actualiza la suscripción después de generar factura - VERSIÓN MEJORADA
         """
         subscription.recurring_invoice_count += 1
         subscription.invoices_generated += 1
         subscription.total_invoiced += invoice.amount_total
         
-        # Calcular próxima fecha de facturación
+        # Calcular próxima fecha de facturación usando la plantilla
         if subscription.contract_template:
-            # Lógica simple por ahora
-            subscription.next_invoice_date = target_date + timedelta(days=30)
+            next_invoice_date = subscription.contract_template.get_next_invoice_date(
+                target_date
+            )
         else:
-            subscription.next_invoice_date = target_date + timedelta(days=30)
+            # Por defecto: 30 días después
+            next_invoice_date = target_date + timedelta(days=30)
         
+        subscription.next_invoice_date = next_invoice_date
         subscription.save()
 
 # Funciones de conveniencia

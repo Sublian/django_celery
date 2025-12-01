@@ -1,7 +1,8 @@
 # billing/services/sequence_service.py
+from datetime import time
 import logging
 import re
-from django.db import transaction
+from django.db import OperationalError, transaction
 from django.db.models import Q
 from ..models import Sequence, InvoiceSerie, AccountMove, Company, SaleSubscription
 
@@ -65,29 +66,47 @@ class SequenceService:
         Obtiene la secuencia apropiada para un partner
         """
         document_type = self.get_document_type(partner)
-        return self.get_sequence(company, document_type)
+        return self.get_sequence('account.move', company, document_type)
     
-    def generate_next_reference(self, sequence_type, company, document_type=None):
-        """
-        Genera la próxima referencia - VERSIÓN CORREGIDA
-        """
-        sequence = self.get_sequence(sequence_type, company, document_type)
+    def generate_next_reference(self, sequence_type, company, document_type=None, retries=3):
+        """Genera la próxima referencia - VERSIÓN CORREGIDA - Versión con reintentos"""
+        for attempt in range(retries):
+            try:
+                
+                sequence = self.get_sequence(sequence_type, company, document_type)
+                # logger.info(f"   🔄️ Obtained sequence: {sequence.code} for company {company}")
         
-        with transaction.atomic():
-            next_reference = sequence.next_by_code()
+                # Usamos un bloque atómico con lock explícito
+                with transaction.atomic():
+                    # Forzamos el lock de la secuencia para evitar duplicados concurrentes
+                    locked_sequence = Sequence.objects.select_for_update(
+                        nowait=True  # Esto evita deadlocks
+                    ).get(id=sequence.id)
             
-            logger.info(f"📄 Referencia generada: {next_reference} "
-                       f"(Tipo: {sequence_type}, Secuencia: {sequence.code})")
-            
-            return next_reference
+                    next_reference = locked_sequence.next_by_code()
+                    
+                    if self.verify_unique_reference(next_reference, sequence_type, company, document_type):
+                        return next_reference
+                    else:
+                        logger.warning(f"Referencia duplicada generada: {next_reference}. Reintentando...")
+                        continue  # Reintentar
+
+            except OperationalError as e:
+            # Deadlock o timeout, reintentar
+                if attempt < retries - 1:
+                    logger.warning(f"Intento {attempt + 1} fallado, reintentando...")
+                    time.sleep(0.1 * (attempt + 1))  # Backoff exponencial
+                else:
+                    raise
     
     def generate_subscription_code(self, company):
-        """Genera código único para suscripción"""
+        """Genera código único para suscripción - VERSIÓN CORREGIDA"""
         return self.generate_next_reference('sale.subscription', company)
     
     def generate_invoice_reference(self, company, partner):
         """Genera referencia para factura/boleta basado en partner"""
         document_type = self._determine_document_type(partner)
+        logger.info(f"   🔄️ Determined document type: {document_type} for partner {partner}")
         return self.generate_next_reference('account.move', company, document_type)
     
     def _determine_document_type(self, partner):
@@ -109,11 +128,28 @@ class SequenceService:
         
         synced_count = 0
         for sequence in sequences:
-            if sequence.sync_with_existing_invoices():
+            if self._safe_sync_sequence(sequence):
                 synced_count += 1
-                logger.info(f"🔄 Secuencia sincronizada: {sequence.code} -> {sequence.number_next}")
         
         return synced_count
+    
+    def _safe_sync_sequence(self, sequence):
+        """Sincroniza una secuencia de forma segura"""
+        try:
+            last_used = sequence.get_last_used_number()
+            logger.info(f"🔄 Secuencia {sequence.code}: último usado {last_used}")
+            
+            if last_used is not None:
+                # Asegurar que number_next sea mayor que el último usado
+                if sequence.number_next <= last_used:
+                    sequence.number_next = last_used + sequence.number_increment
+                    sequence.save(update_fields=['number_next', 'updated_at'])
+                    logger.info(f"✅ Secuencia sincronizada: {sequence.code} -> {sequence.number_next}")
+                    return True
+        except Exception as e:
+            logger.error(f"❌ Error sincronizando secuencia {sequence.code}: {e}")
+        
+        return False
     
     def validate_sequence_consistency(self, company_id=None):
         """
@@ -126,22 +162,62 @@ class SequenceService:
         inconsistencies = []
         
         for sequence in sequences:
-            last_used = sequence.get_last_used_number()
-            if last_used is not None and sequence.number_next <= last_used:
+            try:
+                    
+                last_used = sequence.get_last_used_number()
+                if last_used is not None and sequence.number_next <= last_used:
+                    inconsistencies.append({
+                        'sequence': sequence.code,
+                        'current_next': sequence.number_next,
+                        'last_used': last_used,
+                        'difference': last_used - sequence.number_next,
+                        'status': '⚠️ REQUIERE SINCRONIZACIÓN'
+                    })
+            except Exception as e:
+                logger.error(f"❌ Error validando secuencia {sequence.code}: {e}")
                 inconsistencies.append({
                     'sequence': sequence.code,
-                    'current_next': sequence.number_next,
-                    'last_used': last_used,
-                    'difference': last_used - sequence.number_next
+                    'error': str(e),
+                    'status': '❌ ERROR'
                 })
         
         return inconsistencies
+    
+    def verify_unique_reference(self, reference, sequence_type, company, document_type=None):
+        """
+        Verifica que una referencia no esté ya en uso
+        """
+        if sequence_type == 'account.move':
+            # Buscar en AccountMove
+            exists = AccountMove.objects.filter(
+                invoice_number=reference,
+                company=company
+            ).exists()
+            
+            if exists:
+                logger.warning(f"Referencia duplicada encontrada: {reference}")
+                return False
+        
+        elif sequence_type == 'sale.subscription':
+            # Buscar en SaleSubscription
+            exists = SaleSubscription.objects.filter(
+                code=reference,
+                company=company
+            ).exists()
+            
+            if exists:
+                logger.warning(f"Código de suscripción duplicado: {reference}")
+                return False
+        
+        return True
+    
 
 # Funciones de conveniencia
 def get_next_invoice_reference(company, document_type='factura'):
     """Obtiene la próxima referencia para factura"""
     service = SequenceService()
-    return service.generate_next_reference(company, document_type)
+    return service.generate_invoice_reference(company, document_type)
+    # return service.generate_next_reference(company, document_type)
 
 def get_next_subscription_code(company):
     """Obtiene próximo código de suscripción"""
