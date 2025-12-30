@@ -1,9 +1,9 @@
+# pyproject.toml
 [project]
-name = "django-fx"
+name = "django_fx"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
 dependencies = [
     "celery>=5.5.3",
     "django>=5.2.7",
@@ -17,4 +17,8 @@ dependencies = [
     "python-decouple>=3.8",
     "redis>=7.0.1",
     "xlrd>=2.0.2",
+    "requests>=2.27",
+    "openpyxl>=3.0",
+    "numpy>=2.4.0",
 ]
+

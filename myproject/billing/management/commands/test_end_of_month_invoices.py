@@ -279,10 +279,10 @@ class Command(BaseCommand):
         # Determinar tipo de documento
         if client.document_type == 'ruc' and client.num_document and len(client.num_document) == 11:
             document_type = 'invoice'
-            serie = series.filter(series__startswith='F').first()
+            serie = series.filter(series__startswith='F00').first()
         else:
             document_type = 'ticket'
-            serie = series.filter(series__startswith='B').first()
+            serie = series.filter(series__startswith='B00').first()
         
         if not serie:
             return None

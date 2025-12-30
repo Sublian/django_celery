@@ -86,14 +86,14 @@ cd django_celery
 
 ### 2️⃣ Crear entorno virtual
 ```bash
-python -m venv .venv
+uv venv --python 3.11
 source .venv/bin/activate    # Linux/Mac
 .venv\Scripts\activate       # Windows
 ```
 
 ### 3️⃣ Instalar dependencias
 ```bash
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 ### 4️⃣ Configurar variables de entorno

@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'users',
     'core',
     'billing',
+    'api_service',
     "formtools",
     'django_extensions',
     'django.contrib.admin',
