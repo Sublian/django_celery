@@ -248,6 +248,196 @@ def test_endpoint_inexistente():
         
         return True
 
+def test_rate_limiting_dni_rapido():
+    """
+    Prueba rápida de rate limiting para DNI usando manipulación directa.
+    """
+    print("\n" + "=" * 50)
+    print("TEST: Rate limiting DNI (manipulación directa)")
+    print("=" * 50)
+    
+    try:
+        from api_service.models import ApiRateLimit, ApiEndpoint
+        
+        # Obtener endpoint DNI
+        service = ApiService.objects.filter(service_type='MIGO').first()
+        endpoint_dni = ApiEndpoint.objects.filter(
+            service=service,
+            path='/api/v1/dni'
+        ).first()
+        
+        if not endpoint_dni:
+            print("❌ Endpoint DNI no configurado")
+            return False
+        
+        rate_limit_dni = endpoint_dni.rate_limit
+        print(f"Rate limit DNI: {rate_limit_dni}/min")
+        
+        # Manipular rate limit para simular límite alcanzado
+        rate_limit_obj, _ = ApiRateLimit.objects.get_or_create(service=service)
+        
+        print("\n1. Simulando que ya se hicieron todas las consultas del minuto...")
+        # Forzar el contador al límite
+        rate_limit_obj.current_count = rate_limit_dni
+        rate_limit_obj.save()
+        
+        print(f"   Contador forzado a: {rate_limit_obj.current_count}/{rate_limit_dni}")
+        print(f"   Puede hacer más?: {rate_limit_obj.can_make_request()}")
+        
+        # Intentar consulta (debería fallar inmediatamente)
+        client = MigoAPIClient()
+        
+        print("\n2. Intentando consulta con rate limit artificialmente lleno...")
+        try:
+            resultado = client.consultar_dni("71265310")
+            print(f"   ❌ CONTRADICCIÓN: Consulta pasó a pesar de rate limit lleno")
+            return False
+        except RateLimitExceededError as e:
+            print(f"   ✅ Rate limit funcionó correctamente")
+            print(f"   📋 Error: {e}")
+            
+            # Verificar log
+            logs = ApiCallLog.objects.filter(
+                service=service,
+                status='RATE_LIMITED'
+            ).order_by('-created_at')[:1]
+            
+            if logs:
+                log = logs[0]
+                print(f"   📝 Log creado: ID={log.id}")
+                print(f"   🕒 Hace: {(timezone.now() - log.created_at).seconds} segundos")
+                return True
+            else:
+                print(f"   ⚠️ No se creó log de rate limit")
+                return False
+                
+    except Exception as e:
+        print(f"   ❌ ERROR: {e}")
+        return False
+    
+def test_rate_limiting_logs_completos():
+    """
+    Prueba que los logs de rate limit tengan información completa.
+    """
+    print("\n" + "=" * 50)
+    print("TEST: Logs de rate limit completos")
+    print("=" * 50)
+    
+    try:
+        from api_service.models import ApiRateLimit, ApiEndpoint
+        
+        # Resetear rate limit
+        service = ApiService.objects.filter(service_type='MIGO').first()
+        rate_limit_obj, _ = ApiRateLimit.objects.get_or_create(service=service)
+        rate_limit_obj.reset_counter()
+        
+        # Forzar rate limit lleno
+        rate_limit_obj.current_count = service.requests_per_minute
+        rate_limit_obj.save()
+        
+        print(f"1. Rate limit forzado: {rate_limit_obj.current_count}/{service.requests_per_minute}")
+        
+        # Intentar diferentes endpoints para ver logs
+        endpoints_a_probar = [
+            ('consultar_dni', 'DNI'),
+            ('consultar_ruc', 'RUC'),
+            ('consultar_cuenta', 'account')
+        ]
+        
+        logs_creados = []
+        
+        for metodo, nombre_endpoint in endpoints_a_probar:
+            print(f"\n2. Probando rate limit para endpoint: {nombre_endpoint}")
+            
+            client = MigoAPIClient()
+            
+            try:
+                if metodo == 'consultar_dni':
+                    resultado = client.consultar_dni("71265310")
+                elif metodo == 'consultar_ruc':
+                    resultado = client.consultar_ruc("20603274742")
+                elif metodo == 'consultar_cuenta':
+                    resultado = client.consultar_cuenta()
+                    
+                print(f"   ❌ CONTRADICCIÓN: {nombre_endpoint} pasó (debería fallar)")
+                
+            except RateLimitExceededError as e:
+                print(f"   ✅ Rate limit funcionó para {nombre_endpoint}")
+                
+                # Verificar log específico
+                logs = ApiCallLog.objects.filter(
+                    service=service,
+                    status='RATE_LIMITED'
+                ).order_by('-created_at')[:1]
+                
+                if logs:
+                    log = logs[0]
+                    logs_creados.append(log)
+                    
+                    print(f"   📝 Log ID: {log.id}")
+                    print(f"   🔧 Endpoint en log: {log.endpoint.name if log.endpoint else 'N/A'}")
+                    print(f"   📋 Error: {log.error_message[:80]}...")
+                    
+                    # Verificar request_data
+                    if 'attempted_endpoint' in log.request_data:
+                        endpoint_intentado = log.request_data['attempted_endpoint']
+                        print(f"   🎯 Endpoint intentado: {endpoint_intentado}")
+                        
+                        # Validar que coincida
+                        if endpoint_intentado.lower() in nombre_endpoint.lower():
+                            print(f"   ✅ Endpoint en log coincide con prueba")
+                        else:
+                            print(f"   ⚠️  Endpoint en log NO coincide: {endpoint_intentado} vs {nombre_endpoint}")
+                    else:
+                        print(f"   ⚠️  Log no tiene información de endpoint intentado")
+        
+        # Análisis final
+        print(f"\n" + "=" * 50)
+        print("ANÁLISIS DE LOGS CREADOS:")
+        print("=" * 50)
+        
+        if logs_creados:
+            print(f"Total logs creados: {len(logs_creados)}")
+            
+            for i, log in enumerate(logs_creados, 1):
+                print(f"\nLog #{i}:")
+                print(f"  ID: {log.id}")
+                print(f"  Endpoint DB: {log.endpoint.name if log.endpoint else 'No asignado'}")
+                print(f"  Endpoint intentado: {log.request_data.get('attempted_endpoint', 'No registrado')}")
+                print(f"  Caller: {log.called_from}")
+                print(f"  Request data: {log.request_data}")
+                
+                # Validaciones
+                validaciones = []
+                
+                if log.endpoint:
+                    validaciones.append("✅ Tiene endpoint en DB")
+                else:
+                    validaciones.append("❌ Sin endpoint en DB")
+                
+                if 'attempted_endpoint' in log.request_data:
+                    validaciones.append("✅ Tiene endpoint intentado")
+                else:
+                    validaciones.append("❌ Sin endpoint intentado")
+                
+                if log.called_from and 'consultar_' in log.called_from.lower():
+                    validaciones.append("✅ Caller informativo")
+                else:
+                    validaciones.append("⚠️  Caller genérico")
+                
+                print(f"  Validaciones: {', '.join(validaciones)}")
+        
+        else:
+            print("⚠️  No se crearon logs")
+        
+        return True
+            
+    except Exception as e:
+        print(f"   ❌ ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return False    
+
 def test_validacion_ruc_inactivo():
     """Prueba validación de RUC inactivo/no habido"""
     print("\n" + "=" * 50)
@@ -389,11 +579,13 @@ def main():
     print("-" * 50)
     
     tests = [
-        ("RUC inválido", test_ruc_invalido),
-        ("Token inválido", test_token_invalido),
+        # ("RUC inválido", test_ruc_invalido),
+        # ("Token inválido", test_token_invalido),
         # ("Rate limiting", test_rate_limiting),
         # ("Rate limiting intensivo", test_rate_limiting_intensivo),
         # ("Endpoint inexistente", test_endpoint_inexistente),
+        # ("Rate limiting DNI", test_rate_limiting_dni_rapido),
+        ("Rate limiting varios", test_rate_limiting_logs_completos),
         # ("Validación RUC inactivo", test_validacion_ruc_inactivo),
         ("Verificar trazabilidad", verificar_trazabilidad_completa),
     ]

@@ -10,6 +10,9 @@ from .exceptions import (
     APIError, RateLimitExceededError, AuthenticationError,
     APINotFoundError, APIBadResponseError, APITimeoutError
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 class MigoAPIClient:
     """Cliente específico para APIMIGO con todas sus funcionalidades"""
@@ -41,142 +44,135 @@ class MigoAPIClient:
         )
         return endpoint
     
-    def _check_rate_limit(self):
-        """Verifica y respeta el rate limiting del servicio"""
-        rate_limit_obj = ApiRateLimit.objects.get(service=self.service)
-    
+    def _check_rate_limit(self, endpoint_name=None):
+        """
+        Verifica rate limit y lanza excepción si se excede.
+        Solo debe lanzar excepción, NO devolver True/False.
+        """
+        # 1. Obtener endpoint si tenemos el nombre
+        endpoint_obj = None
+        if endpoint_name:
+            endpoint_obj = self.endpoints.get(endpoint_name)
+        
+        # 2. Determinar límite real (endpoint específico o servicio general)
+        if endpoint_obj and hasattr(endpoint_obj, 'custom_rate_limit') and endpoint_obj.custom_rate_limit:
+            limit = endpoint_obj.custom_rate_limit
+        else:
+            limit = self.service.requests_per_minute
+        
+        # 3. Obtener o crear rate limit
+        rate_limit_obj, created = ApiRateLimit.objects.get_or_create(service=self.service)
+        
+        # 4. Verificar si puede hacer la petición
         if not rate_limit_obj.can_make_request():
             wait_time = rate_limit_obj.get_wait_time()
-            raise RateLimitExceededError(wait_time, self.service.requests_per_minute)
-        
-        return True
-    
+            
+            # 5. Obtener información del caller de forma simple
+            caller_info = self._get_caller_info()
+            
+            # 6. Crear request_data mejorado
+            request_data = {
+                'rate_limit_check': True,
+                'attempted_endpoint': endpoint_name or 'unknown',
+                'caller': caller_info,
+                'current_count': rate_limit_obj.current_count,
+                'limit': limit,
+                'wait_time_seconds': wait_time,
+                'endpoint_specific_limit': endpoint_obj.custom_rate_limit if endpoint_obj else None
+            }
+            
+            # 7. Crear log del rate limit
+            api_log = ApiCallLog.objects.create(
+                service=self.service,
+                endpoint=endpoint_obj,
+                status='RATE_LIMITED',
+                request_data=request_data,
+                error_message=f'Rate limit excedido. Límite: {limit}/min. Esperar: {wait_time}s. Endpoint intentado: {endpoint_name or "unknown"}',
+                called_from=caller_info,
+                response_code=429
+            )
+            
+            logger.warning(
+                f"Rate limit excedido para {self.service.name}. "
+                f"Endpoint: {endpoint_name}. Límite: {limit}/min. "
+                f"Log ID: {api_log.id}"
+            )
+            
+            # 8. Lanzar excepción
+            raise RateLimitExceededError(wait_time, limit)
+
     def _make_request(self, endpoint_name, payload):
         """Método base para hacer peticiones con auditoría completa"""
-        if not self._check_rate_limit():
-            # Podrías encolar esto en Celery para reintentar más tarde
-            raise Exception(f"Rate limit excedido para {self.service.name}")
+        # 1. Verificar rate limiting (lanza excepción si falla)
+        # Ya no necesitamos verificar el retorno
+        self._check_rate_limit(endpoint_name=endpoint_name)
         
-        endpoint = self.endpoints[endpoint_name]
+        # 2. Obtener endpoint
+        endpoint = self.endpoints.get(endpoint_name)
+        if not endpoint:
+            raise ValueError(f"Endpoint '{endpoint_name}' no configurado")
+        
         url = f"{self.base_url.rstrip('/')}{endpoint.path}"
         
-        # Preparar payload con token
+        # 3. Preparar payload con token
         payload_with_token = {'token': self.token, **payload}
         
-        # Crear log de auditoría
+        # 4. Crear log de auditoría
         api_log = ApiCallLog.objects.create(
             service=self.service,
             endpoint=endpoint,
             request_data=payload_with_token,
-            called_from=self._get_caller_info()
+            called_from=self._get_caller_info(),
+            status='PENDING'
         )
         
         try:
             start_time = time.time()
             
+            # 5. Hacer petición HTTP
             response = requests.post(
                 url,
                 json=payload_with_token,
                 headers={'Content-Type': 'application/json'},
-                timeout=30  # 30 segundos timeout
+                timeout=30
             )
             
             duration_ms = int((time.time() - start_time) * 1000)
             
-            # Actualizar log con respuesta
-            api_log.duration_ms = duration_ms
-            api_log.response_code = response.status_code
-            
-            if response.status_code == 200:
-                try:
-                    
-                    response_data = response.json()
-                    api_log.response_data = response_data
-                    
-                    if response_data.get('success'):
-                        api_log.status = 'SUCCESS'
-                        api_log.save()
-                        
-                        # Actualizar rate limit
-                        rate_limit = ApiRateLimit.objects.get(service=self.service)
-                        rate_limit.increment_count()
-                        
-                        return response_data
-                    else:
-                        # RUC no existe u otro error de negocio
-                        api_log.status = 'FAILED'
-                        error_msg = response_data.get('message', 'Error desconocido en API')
-                        api_log.error_message = error_msg
-                        api_log.save()
-                        
-                        if 'no existe' in error_msg.lower() or 'not found' in error_msg.lower():
-                            raise APINotFoundError(f"Recurso no encontrado: {error_msg}")
-                        else:
-                            raise APIError(f"Error de API: {error_msg}")
-                
-                except ValueError:  # JSON decode error
-                    # APIMIGO devuelve HTML cuando token es inválido
-                    api_log.status = 'FAILED'
-                    if 'token_invalido' in response.text.lower() or 'unauthorized' in response.text.lower():
-                        api_log.error_message = "Token inválido o no autorizado"
-                        api_log.save()
-                        raise AuthenticationError("Token APIMIGO inválido o no autorizado")
-                    else:
-                        api_log.error_message = f"Respuesta no JSON: {response.text[:200]}"
-                        api_log.save()
-                        raise APIBadResponseError("Respuesta inesperada de APIMIGO")
-            
-            elif response.status_code == 404:
-                api_log.status = 'FAILED'
-                if endpoint_name in ['ruc', 'dni']:
-                    api_log.error_message = f"{'RUC' if endpoint_name == 'ruc' else 'DNI'} no encontrado"
-                    api_log.save()
-                    raise APINotFoundError(api_log.error_message)
-                else:
-                    api_log.error_message = "Endpoint no encontrado"
-                    api_log.save()
-                    raise APINotFoundError("Endpoint no encontrado")
-            
-            elif response.status_code == 401 or response.status_code == 403:
-                api_log.status = 'FAILED'
-                api_log.error_message = "Authentication failed"
-                api_log.save()
-                raise AuthenticationError(f"Authentication failed: {response.status_code}")
-            
-            else:
-                error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
-                api_log.status = 'FAILED'
-                api_log.error_message = error_msg
-                api_log.save()
-                raise APIError(error_msg)
+            # 6. Procesar respuesta
+            return self._process_response(response, api_log, endpoint_name, duration_ms)
                 
         except requests.exceptions.Timeout:
-            api_log.status = 'FAILED'
-            api_log.error_message = "Timeout de conexión"
-            api_log.save()
-            raise Exception("Timeout al conectar con APIMIGO")
-        
+            self._handle_exception(api_log, "Timeout de conexión", APITimeoutError("Timeout al conectar con APIMIGO"))
+            
         except requests.exceptions.ConnectionError:
-            api_log.status = 'FAILED'
-            api_log.error_message = "Error de conexión"
-            api_log.save()
-            raise Exception("No se pudo conectar con APIMIGO")
-        
+            self._handle_exception(api_log, "Error de conexión", APIError("No se pudo conectar con APIMIGO"))
+            
         except Exception as e:
-            api_log.status = 'FAILED'
-            api_log.error_message = str(e)
-            api_log.save()
-            raise
+            self._handle_exception(api_log, str(e), e)    
     
     def _get_caller_info(self):
-        """Obtiene información sobre quién llamó a la API"""
+        """Obtiene información simple sobre quién llamó"""
         import inspect
         stack = inspect.stack()
-        # Busca el primer caller fuera de esta clase
-        for frame_info in stack[2:]:
+        
+        # Buscar el primer caller fuera de esta clase
+        for frame_info in stack[2:]:  # Saltar _get_caller_info y el método que lo llamó
+            function_name = frame_info.function
+            
+            # Saltar métodos internos
+            if function_name.startswith('_') and function_name not in ['__init__']:
+                continue
+                
             if 'self' in frame_info.frame.f_locals:
                 caller = frame_info.frame.f_locals['self']
-                return f"{caller.__class__.__name__}.{frame_info.function}"
+                return f"{caller.__class__.__name__}.{function_name}"
+            else:
+                module = frame_info.frame.f_globals.get('__name__', 'unknown')
+                # Omitir módulos Django internos
+                if not module.startswith('django.'):
+                    return f"{module}.{function_name}"
+        
         return "unknown"
     
     # Métodos específicos de APIMIGO
@@ -463,4 +459,76 @@ class MigoAPIClient:
         
         return resultados    
 
-    
+    def _process_response(self, response, api_log, endpoint_name, duration_ms):
+        """Procesa la respuesta HTTP y actualiza el log"""
+        api_log.duration_ms = duration_ms
+        api_log.response_code = response.status_code
+        
+        if response.status_code == 200:
+            try:
+                response_data = response.json()
+                api_log.response_data = response_data
+                
+                if response_data.get('success'):
+                    # ÉXITO
+                    api_log.status = 'SUCCESS'
+                    api_log.save()
+                    
+                    # Actualizar rate limit
+                    rate_limit_obj = ApiRateLimit.objects.get(service=self.service)
+                    rate_limit_obj.increment_count()
+                    
+                    return response_data
+                else:
+                    # Error de negocio (ej: RUC no existe)
+                    error_msg = response_data.get('message', 'Error desconocido en API')
+                    api_log.status = 'FAILED'
+                    api_log.error_message = error_msg
+                    api_log.save()
+                    
+                    if 'no existe' in error_msg.lower() or 'not found' in error_msg.lower():
+                        raise APINotFoundError(f"Recurso no encontrado: {error_msg}")
+                    else:
+                        raise APIError(f"Error de API: {error_msg}")
+                        
+            except ValueError:  # JSON decode error
+                api_log.status = 'FAILED'
+                if 'token_invalido' in response.text.lower() or 'unauthorized' in response.text.lower():
+                    api_log.error_message = "Token inválido o no autorizado"
+                    api_log.save()
+                    raise AuthenticationError("Token APIMIGO inválido o no autorizado")
+                else:
+                    api_log.error_message = f"Respuesta no JSON: {response.text[:200]}"
+                    api_log.save()
+                    raise APIBadResponseError("Respuesta inesperada de APIMIGO")
+        
+        elif response.status_code == 404:
+            api_log.status = 'FAILED'
+            if endpoint_name in ['ruc', 'dni']:
+                api_log.error_message = f"{'RUC' if endpoint_name == 'ruc' else 'DNI'} no encontrado"
+                api_log.save()
+                raise APINotFoundError(api_log.error_message)
+            else:
+                api_log.error_message = "Endpoint no encontrado"
+                api_log.save()
+                raise APINotFoundError("Endpoint no encontrado")
+        
+        elif response.status_code in [401, 403]:
+            api_log.status = 'FAILED'
+            api_log.error_message = "Authentication failed"
+            api_log.save()
+            raise AuthenticationError(f"Authentication failed: {response.status_code}")
+        
+        else:
+            error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
+            api_log.status = 'FAILED'
+            api_log.error_message = error_msg
+            api_log.save()
+            raise APIError(error_msg)
+
+    def _handle_exception(self, api_log, error_message, exception):
+        """Maneja excepciones y actualiza el log"""
+        api_log.status = 'FAILED'
+        api_log.error_message = error_message
+        api_log.save()
+        raise exception

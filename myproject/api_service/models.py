@@ -14,6 +14,7 @@ Principales entidades:
 - ApiEndpoint: Endpoints específicos de cada servicio
 - ApiCallLog: Auditoría de cada llamada API
 - ApiBatchRequest: Solicitudes masivas de procesamiento
+- ApiRateLimit: Control de rate limiting en tiempo real
 """
 
 import uuid
@@ -522,6 +523,14 @@ class ApiRateLimit(models.Model):
         related_name='rate_limit_status',
         help_text="Servicio API monitoreado"
     )
+    endpoint = models.ForeignKey(
+        ApiEndpoint,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='rate_limits',
+        help_text="Endpoint específico (null para límite general del servicio)"
+    )
     
     current_count = models.IntegerField(
         default=0,
@@ -546,9 +555,22 @@ class ApiRateLimit(models.Model):
     class Meta:
         verbose_name = "Control de Rate Limit"
         verbose_name_plural = "Controles de Rate Limit"
+        unique_together = ['service', 'endpoint']  # Una entrada por servicio-endpoint
+        indexes = [
+            models.Index(fields=['service', 'endpoint']),
+            models.Index(fields=['minute_window_start']),
+        ]
     
     def __str__(self):
-        return f"Rate Limit: {self.service.name} ({self.current_count}/{self.service.requests_per_minute})"
+        if self.endpoint:
+            return f"Rate Limit: {self.service.name} - {self.endpoint.name} ({self.current_count}/{self.get_limit()})"
+        return f"Rate Limit: {self.service.name} ({self.current_count}/{self.get_limit()})"
+    
+    def get_limit(self):
+        """Obtiene el límite aplicable"""
+        if self.endpoint and self.endpoint.custom_rate_limit:
+            return self.endpoint.custom_rate_limit
+        return self.service.requests_per_minute
     
     def can_make_request(self):
         """
@@ -597,3 +619,18 @@ class ApiRateLimit(models.Model):
         self.current_count = 0
         self.minute_window_start = timezone.now()
         self.save()
+        
+    @classmethod
+    def get_for_service_endpoint(cls, service, endpoint=None):
+        """
+        Obtiene o crea un ApiRateLimit para un servicio (y opcionalmente endpoint).
+        """
+        obj, created = cls.objects.get_or_create(
+            service=service,
+            endpoint=endpoint,
+            defaults={
+                'current_count': 0,
+                'total_requests': 0
+            }
+        )
+        return obj, created
