@@ -24,15 +24,25 @@ class MigoAPIClient:
         
         self.token = token or self.service.auth_token
         self.base_url = self.service.base_url
+        self.version = "1.0"  # Definir versión para User-Agent
+        self.timeout = 30  # Definir timeout
         
         # Mapeo de endpoints MIGO
         self.endpoints = {
-            'account': self._get_endpoint('account', '/api/v1/account'),
-            'ruc': self._get_endpoint('ruc', '/api/v1/ruc'),
-            'ruc_collection': self._get_endpoint('ruc_collection', '/api/v1/ruc/collection'),
-            'dni': self._get_endpoint('dni', '/api/v1/dni'),
-            'tipo_cambio': self._get_endpoint('tipo_cambio', '/api/v1/tipo_cambio'),
-            'representantes': self._get_endpoint('representantes', '/api/v1/representantes'),
+            'consulta_cuenta': self._get_endpoint('consulta_cuenta', '/api/v1/account'),
+            'consulta_ruc': self._get_endpoint('consulta_ruc', '/api/v1/ruc'),
+            'consulta_dni': self._get_endpoint('consulta_dni', '/api/v1/dni'),
+            'consulta_ruc_masivo': self._get_endpoint('consulta_ruc_masivo', '/api/v1/ruc/collection'),
+            'tipo_cambio_latest': self._get_endpoint('tipo_cambio_latest', '/api/v1/exchange/latest'),
+            'tipo_cambio_fecha': self._get_endpoint('tipo_cambio_fecha', '/api/v1/exchange/date'),
+            'tipo_cambio_rango': self._get_endpoint('tipo_cambio_rango', '/api/v1/exchange'),
+            'representantes_legales': self._get_endpoint('representantes_legales', '/api/v1/ruc/representantes-legales'),
+        }
+        # Mantener compatibilidad con métodos existentes
+        self.endpoint_aliases = {
+            'account': 'consulta_cuenta',
+            'ruc': 'consulta_ruc',
+            'dni': 'consulta_dni',
         }
     
     def _get_endpoint(self, name, path):
@@ -101,16 +111,38 @@ class MigoAPIClient:
             # 8. Lanzar excepción
             raise RateLimitExceededError(wait_time, limit)
 
-    def _make_request(self, endpoint_name, payload):
+    def _make_request(self, endpoint_name, payload, endpoint_name_display=None):
         """Método base para hacer peticiones con auditoría completa"""
+        
         # 1. Verificar rate limiting (lanza excepción si falla)
-        # Ya no necesitamos verificar el retorno
         self._check_rate_limit(endpoint_name=endpoint_name)
         
         # 2. Obtener endpoint
         endpoint = self.endpoints.get(endpoint_name)
         if not endpoint:
-            raise ValueError(f"Endpoint '{endpoint_name}' no configurado")
+            api_log = ApiCallLog.objects.create(
+                service=self.service,
+                status='FAILED',
+                request_data=payload,
+                error_message=f'Endpoint no configurado: {endpoint_name}',
+                called_from=self._get_caller_info(),
+                response_code=400
+            )
+            raise ValueError(f"Endpoint '{endpoint_name}' no configurado en el sistema")
+        
+        # 3. VERIFICAR SI EL ENDPOINT ESTÁ ACTIVO
+        if not endpoint.is_active:
+            # Crear log específico para endpoint inactivo
+            api_log = ApiCallLog.objects.create(
+                service=self.service,
+                endpoint=endpoint,
+                status='FAILED',
+                request_data=payload,
+                error_message=f'Endpoint inactivo: {endpoint.name}',
+                called_from=self._get_caller_info(),
+                response_code=403  # Forbidden
+            )
+            raise ValueError(f"Endpoint '{endpoint.name}' está marcado como inactivo")
         
         url = f"{self.base_url.rstrip('/')}{endpoint.path}"
         
@@ -178,7 +210,11 @@ class MigoAPIClient:
     # Métodos específicos de APIMIGO
     def consultar_cuenta(self):
         """Consulta información de la cuenta MIGO"""
-        return self._make_request('account', {})
+        return self._make_request(
+            endpoint_name='consulta_cuenta',
+            payload={},
+            endpoint_name_display='Consulta cuenta APIMIGO'
+        )
     
     def consultar_ruc(self, ruc):
         """Consulta datos de un RUC en SUNAT"""
@@ -188,7 +224,7 @@ class MigoAPIClient:
         if cached_data:
             return cached_data
         
-        result = self._make_request('ruc', {'ruc': ruc})
+        result = self._make_request('consulta_ruc', {'ruc': ruc})
         
         # Cachear por 24 horas
         if result.get('success'):
@@ -204,7 +240,7 @@ class MigoAPIClient:
         if cached_data:
             return cached_data
         
-        result = self._make_request('dni', {'dni': dni})
+        result = self._make_request('consulta_dni', {'dni': dni})
         
         # Cachear por 24 horas
         if result.get('success'):
@@ -212,16 +248,68 @@ class MigoAPIClient:
         
         return result
     
-    def consultar_tipo_cambio(self, fecha=None):
-        """Consulta tipo de cambio SUNAT/SBS"""
-        payload = {}
-        if fecha:
-            payload['fecha'] = fecha
-        return self._make_request('tipo_cambio', payload)
+    def consultar_tipo_cambio_latest(self):
+        """
+        Consulta el tipo de cambio más reciente.
+        Endpoint: POST /api/v1/exchange/latest
+        Returns:
+            Dict: Tipo de cambio del día más reciente
+        """
+        return self._make_request(
+            endpoint_name='tipo_cambio_latest',
+            payload={'token': self.token},
+            endpoint_name_display='Consulta tipo cambio más reciente'
+        )
+        
+    def consultar_tipo_cambio_fecha(self, fecha):
+        """
+        Consulta tipo de cambio para una fecha específica.
+        Endpoint: POST /api/v1/exchange/date
+        Args:
+            fecha: Fecha en formato YYYY-MM-DD
+        Returns:
+            Dict: Tipo de cambio para la fecha especificada
+        """
+        return self._make_request(
+            endpoint_name='tipo_cambio_fecha',
+            payload={'token': self.token, 'fecha': fecha},
+            endpoint_name_display=f'Consulta tipo cambio fecha {fecha}'
+        )
+    
+    def consultar_tipo_cambio_rango(self, fecha_inicio, fecha_fin):
+        """
+        Consulta tipo de cambio por rango de fechas.        
+        Endpoint: POST /api/v1/exchange        
+        Args:
+            fecha_inicio: Fecha inicio (YYYY-MM-DD)
+            fecha_fin: Fecha fin (YYYY-MM-DD)
+        Returns:
+            Dict: Tipos de cambio en el rango
+        """
+        return self._make_request(
+            endpoint_name='tipo_cambio_rango',
+            payload={
+                'token': self.token,
+                'fecha_inicio': fecha_inicio,
+                'fecha_fin': fecha_fin
+            },
+            endpoint_name_display=f'Consulta tipo cambio rango {fecha_inicio} a {fecha_fin}'
+        )
     
     def consultar_representantes_legales(self, ruc):
-        """Consulta representantes legales de una empresa"""
-        return self._make_request('representantes', {'ruc': ruc})
+        """
+        Consulta representantes legales de un RUC.
+        Endpoint: POST /api/v1/ruc/representantes-legales
+        Args:
+            ruc: Número de RUC
+        Returns:
+            Dict: Lista de representantes legales
+        """
+        return self._make_request(
+            endpoint_name='representantes_legales',
+            payload={'token': self.token, 'ruc': ruc},
+            endpoint_name_display='Consulta representantes legales'
+        )
     
     def validar_ruc_para_facturacion (self, ruc):
         """Verificación específica para facturación: RUC activo y habido"""
@@ -285,19 +373,282 @@ class MigoAPIClient:
                 'advertencias': []
             }
 
-    def consultar_ruc_masivo(self, ruc_list, batch_id=None):
+    def _particionar_rucs_en_lotes(self, ruc_list, tamano_lote=None):
         """
-        Consulta masiva de RUCs (máximo 100 por llamada)
+        Particiona una lista de RUCs en lotes del tamaño especificado.
+        Args:
+            ruc_list: Lista de RUCs a particionar
+            tamano_lote: Tamaño máximo de cada lote (por defecto 100, límite de APIMIGO)
+        Returns:
+            Lista de lotes (cada lote es una lista de RUCs)
+        Ejemplo:
+            >>> _particionar_rucs_en_lotes([1,2,3,4,5], 2)
+            [[1,2], [3,4], [5]]
+        """
+        if not isinstance(ruc_list, list):
+            raise ValueError("ruc_list debe ser una lista")
+        # Determinar tamaño de lote
+        if tamano_lote is None:
+            if self.service and hasattr(self.service, 'max_batch_size') and self.service.max_batch_size:
+                tamano_lote = self.service.max_batch_size
+            else:
+                tamano_lote = 100  # Valor por defecto seguro
+        if tamano_lote <= 0:
+            raise ValueError("tamano_lote debe ser mayor a 0")
+        
+        # Normalizar RUCs antes de particionar
+        lotes = []
+        lote_actual = []
+        
+        for ruc in ruc_list:
+            # Normalizar cada RUC
+            if isinstance(ruc, (int, float)):
+                ruc_normalizado = str(int(ruc))
+            elif isinstance(ruc, str):
+                ruc_normalizado = ruc.strip()
+            else:
+                raise ValueError(f"Tipo de dato no válido para RUC: {type(ruc)}")
+            
+            # Validar formato básico
+            if len(ruc_normalizado) != 11 or not ruc_normalizado.isdigit():
+                raise ValueError(f"RUC inválido: {ruc_normalizado}. Debe tener 11 dígitos")
+            
+            lote_actual.append(ruc_normalizado)
+            
+            # Si el lote alcanzó el tamaño máximo, agregarlo y comenzar uno nuevo
+            if len(lote_actual) >= tamano_lote:
+                lotes.append(lote_actual)
+                lote_actual = []
+        
+        # Agregar el último lote si no está vacío
+        if lote_actual:
+            lotes.append(lote_actual)
+        
+        return lotes
+
+    def _analizar_facturacion(self, resultados):
+        """
+        Analiza qué RUCs están habilitados para facturación según SUNAT.
+        
+        Criterios para facturación válida:
+        1. Estado: ACTIVO (no BAJA, SUSPENSION_TEMPORAL, etc.)
+        2. Condición: HABIDO (no NO_HABIDO)
+        3. Tipo de contribuyente: No debe ser EXTRANJERO_NO_DOMICILIADO sin ciertas condiciones
+        4. Ubicación: Debe tener dirección válida en Perú
         
         Args:
-            ruc_list: Lista de RUCs a consultar
-            batch_id: ID de ApiBatchRequest para tracking
+            resultados: Lista de diccionarios con datos de RUC
         
         Returns:
-            dict con resultados y estadísticas
+            dict con análisis de facturación
         """
-        if len(ruc_list) > 100:
-            raise ValueError("Máximo 100 RUCs por consulta masiva")
+        habilitados = []
+        no_habilitados = []
+        advertencias = []
+        
+        for item in resultados:
+            if not isinstance(item, dict) or not item.get('success'):
+                # Si no es exitoso, no se puede analizar
+                no_habilitados.append({
+                    'ruc': item.get('ruc', 'DESCONOCIDO'),
+                    'razon': item.get('nombre_o_razon_social', ''),
+                    'motivo': 'Consulta fallida',
+                    'detalle': item.get('error', 'Error desconocido')
+                })
+                continue
+            
+            ruc = item.get('ruc')
+            razon = item.get('nombre_o_razon_social', '')
+            estado = item.get('estado_del_contribuyente', '')
+            condicion = item.get('condicion_de_domicilio', '')
+            tipo_contribuyente = item.get('tipo_contribuyente', '')
+            
+            motivos_rechazo = []
+            advertencias_ruc = []
+            
+            # 1. Verificar estado
+            if estado != 'ACTIVO':
+                motivos_rechazo.append(f"Estado: {estado}")
+            
+            # 2. Verificar condición
+            if condicion != 'HABIDO':
+                motivos_rechazo.append(f"Condición: {condicion}")
+            
+            # 3. Verificar tipo de contribuyente
+            if tipo_contribuyente in ['EXTRANJERO_NO_DOMICILIADO', 'NO_DOMICILIADO']:
+                advertencias_ruc.append(f"Tipo contribuyente: {tipo_contribuyente} - Verificar retenciones")
+            
+            # 4. Verificar dirección
+            direccion = item.get('direccion', '')
+            if not direccion or len(direccion.strip()) < 10:
+                advertencias_ruc.append("Dirección incompleta o muy corta")
+            
+            # 5. Verificar actualización (si tiene más de 1 año, podría estar desactualizado)
+            actualizado_en = item.get('actualizado_en', '')
+            if actualizado_en:
+                try:
+                    from datetime import datetime
+                    fecha_actualizacion = datetime.strptime(actualizado_en, '%Y-%m-%d %H:%M:%S')
+                    dias_desde_actualizacion = (datetime.now() - fecha_actualizacion).days
+                    if dias_desde_actualizacion > 365:
+                        advertencias_ruc.append(f"Datos desactualizados ({dias_desde_actualizacion} días)")
+                except:
+                    pass
+            
+            # Clasificar resultado
+            if not motivos_rechazo:
+                habilitados.append({
+                    'ruc': ruc,
+                    'razon_social': razon,
+                    'estado': estado,
+                    'condicion': condicion,
+                    'advertencias': advertencias_ruc,
+                    'direccion': direccion[:100] + '...' if len(direccion) > 100 else direccion,
+                    'actualizado_en': actualizado_en
+                })
+            else:
+            # if motivos_rechazo:
+                no_habilitados.append({
+                    'ruc': ruc,
+                    'razon_social': razon,
+                    'motivos': motivos_rechazo,
+                    'estado': estado,
+                    'condicion': condicion
+                })
+            
+            if advertencias_ruc:
+                advertencias.append({
+                    'ruc': ruc,
+                    'razon_social': razon,
+                    'advertencias': advertencias_ruc
+                })
+        
+        return {
+            'total_analizados': len(resultados),
+            'habilitados_facturacion': {
+                'cantidad': len(habilitados),
+                'porcentaje': (len(habilitados) / len(resultados) * 100) if resultados else 0,
+                'items': habilitados
+            },
+            'no_habilitados_facturacion': {
+                'cantidad': len(no_habilitados),
+                'porcentaje': (len(no_habilitados) / len(resultados) * 100) if resultados else 0,
+                'items': no_habilitados
+            },
+            'advertencias': {
+                'cantidad': len(advertencias),
+                'porcentaje': (len(advertencias) / len(resultados) * 100) if resultados else 0,
+                'items': advertencias
+            }
+        }
+        
+    def validar_rucs_para_facturacion(self, ruc_list):
+        """
+        Valida específicamente si RUCs están habilitados para facturación.
+        Args:
+            ruc_list: Lista de RUCs a validar
+        Returns:
+            dict con validación detallada por RUC
+        """
+        # Consultar los RUCs
+        resultado = self.consultar_ruc_masivo(ruc_list)
+        
+        if not resultado.get('success'):
+            return {
+                'success': False,
+                'error': resultado.get('error', 'Error en consulta'),
+                'validaciones': []
+            }
+        
+        validaciones = []
+        
+        for ruc_data in resultado.get('results', []):
+            ruc = ruc_data.get('ruc', '')
+            razon = ruc_data.get('nombre_o_razon_social', '')
+            
+            if not ruc_data.get('success'):
+                validaciones.append({
+                    'ruc': ruc,
+                    'razon_social': razon,
+                    'valido_facturacion': False,
+                    'motivo': 'Consulta fallida',
+                    'detalles': ruc_data.get('error', 'Error desconocido')
+                })
+                continue
+            
+            # Aplicar criterios de facturación
+            criterios = {
+                'estado_activo': ruc_data.get('estado_del_contribuyente') == 'ACTIVO',
+                'habido': ruc_data.get('condicion_de_domicilio') == 'HABIDO',
+                'direccion_valida': len(ruc_data.get('direccion', '').strip()) > 10,
+                'datos_actualizados': 'actualizado_en' in ruc_data
+            }
+            
+            valido = all(criterios.values())
+            
+            validaciones.append({
+                'ruc': ruc,
+                'razon_social': razon,
+                'valido_facturacion': valido,
+                'criterios': criterios,
+                'estado': ruc_data.get('estado_del_contribuyente'),
+                'condicion': ruc_data.get('condicion_de_domicilio'),
+                'direccion': ruc_data.get('direccion', '')[:50] + '...' if len(ruc_data.get('direccion', '')) > 50 else ruc_data.get('direccion', ''),
+                'motivo': 'Válido' if valido else ', '.join([k for k, v in criterios.items() if not v])
+            })
+        
+        # Resumen
+        validos = [v for v in validaciones if v['valido_facturacion']]
+        
+        return {
+            'success': True,
+            'total_rucs': len(ruc_list),
+            'validos_facturacion': len(validos),
+            'invalidos_facturacion': len(validaciones) - len(validos),
+            'porcentaje_valido': (len(validos) / len(validaciones) * 100) if validaciones else 0,
+            'validaciones': validaciones,
+            'resumen_criterios': {
+                'estado_activo': sum(1 for v in validaciones if v.get('criterios', {}).get('estado_activo', False)),
+                'habido': sum(1 for v in validaciones if v.get('criterios', {}).get('habido', False)),
+                'direccion_valida': sum(1 for v in validaciones if v.get('criterios', {}).get('direccion_valida', False)),
+                'datos_actualizados': sum(1 for v in validaciones if v.get('criterios', {}).get('datos_actualizados', False))
+            }
+        }
+
+    def consultar_ruc_masivo_completo(self, ruc_list, batch_id=None, tamano_lote=None):
+        """
+        Consulta masiva de RUCs sin límite de cantidad (usa particionado automático).
+        
+        Args:
+            ruc_list: Lista de RUCs a consultar (cualquier cantidad)
+            batch_id: ID de ApiBatchRequest para tracking
+            tamano_lote: Tamaño de cada lote (máximo 100 por APIMIGO, por defecto 100)
+        
+        Returns:
+            dict con resultados consolidados de todos los lotes
+        """
+        if tamano_lote is None:
+            if self.service and hasattr(self.service, 'max_batch_size') and self.service.max_batch_size:
+                tamano_lote = self.service.max_batch_size
+            else:
+                tamano_lote = 100
+        logger.info(f"Iniciando consulta masiva completa de {len(ruc_list)} RUCs con lotes de {tamano_lote}")
+        
+        # Validar entrada
+        if not isinstance(ruc_list, list):
+            raise ValueError("ruc_list debe ser una lista")
+        
+        if len(ruc_list) == 0:
+            return {
+                'success': True,
+                'total_requested': 0,
+                'total_processed': 0,
+                'successful': 0,
+                'failed': 0,
+                'results': [],
+                'summary': {'activos': 0, 'habidos': 0},
+                'lotes_procesados': 0
+            }
         
         # Registrar batch request si se proporciona batch_id
         batch_request = None
@@ -306,89 +657,292 @@ class MigoAPIClient:
                 batch_request = ApiBatchRequest.objects.get(id=batch_id)
                 batch_request.status = 'PROCESSING'
                 batch_request.total_items = len(ruc_list)
+                batch_request.processed_items = 0
+                batch_request.successful_items = 0
+                batch_request.failed_items = 0
                 batch_request.save()
             except ApiBatchRequest.DoesNotExist:
                 pass
         
         try:
-            # Usar endpoint de colección
-            endpoint = self._get_endpoint('ruc_collection', '/api/v1/ruc/collection')
+            # Particionar RUCs en lotes
+            lotes = self._particionar_rucs_en_lotes(ruc_list, tamano_lote)
             
-            # Verificar rate limit
-            if not self._check_rate_limit():
-                raise Exception("Rate limit excedido para consultas masivas")
+            # Resultados consolidados
+            todos_resultados = []
+            total_exitosos = 0
+            total_fallidos = 0
+            total_procesados = 0
             
-            # Preparar payload
-            payload = {
-                'token': self.token,
-                'ruc': ruc_list
-            }
-            
-            # Hacer la petición
-            result = self._make_request_with_tracking(
-                endpoint_name='ruc_collection',
-                payload=payload,
-                batch_request=batch_request
-            )
-            
-            # Procesar resultados
-            if isinstance(result, list):
-                successful = [r for r in result if r.get('success')]
-                failed = [r for r in result if not r.get('success')]
+            # Procesar cada lote
+            for i, lote in enumerate(lotes):
+                logger.info(f"Procesando lote {i+1}/{len(lotes)} con {len(lote)} RUCs")
                 
-                # Actualizar batch request si existe
-                if batch_request:
-                    batch_request.results = result
-                    batch_request.processed_items = len(result)
-                    batch_request.successful_items = len(successful)
-                    batch_request.failed_items = len(failed)
-                    batch_request.status = 'COMPLETED' if len(failed) == 0 else 'PARTIAL'
-                    batch_request.completed_at = timezone.now()
-                    batch_request.save()
-                
-                return {
-                    'success': True,
-                    'total': len(result),
-                    'successful': len(successful),
-                    'failed': len(failed),
-                    'results': result,
-                    'summary': {
-                        'activos': len([r for r in successful if r.get('estado_del_contribuyente') == 'ACTIVO']),
-                        'habidos': len([r for r in successful if r.get('condicion_de_domicilio') == 'HABIDO']),
-                    }
+                try:
+                    # Consultar el lote actual
+                    resultado_lote = self.consultar_ruc_masivo(lote)
+                    
+                    # Si el lote fue exitoso, procesar resultados
+                    if resultado_lote.get('success'):
+                        resultados_lote = resultado_lote.get('results', [])
+                        todos_resultados.extend(resultados_lote)
+                        
+                        # Contar exitosos y fallidos
+                        for item in resultados_lote:
+                            if isinstance(item, dict) and item.get('success', False):
+                                total_exitosos += 1
+                            else:
+                                total_fallidos += 1
+                        
+                        total_procesados += len(resultados_lote)
+                        
+                        # Actualizar batch request si existe
+                        if batch_request:
+                            batch_request.processed_items = total_procesados
+                            batch_request.successful_items = total_exitosos
+                            batch_request.failed_items = total_fallidos
+                            batch_request.save()
+                    
+                    else:
+                        # Si falló todo el lote
+                        total_fallidos += len(lote)
+                        total_procesados += len(lote)
+                        
+                        # Crear registros fallidos para cada RUC del lote
+                        for ruc in lote:
+                            todos_resultados.append({
+                                'success': False,
+                                'ruc': ruc,
+                                'error': resultado_lote.get('error', 'Error en consulta masiva')
+                            })
+                        
+                        if batch_request:
+                            batch_request.failed_items += len(lote)
+                            batch_request.processed_items += len(lote)
+                            batch_request.save()
+                    
+                    # Respetar rate limiting entre lotes (mínimo 2 segundos)
+                    if i < len(lotes) - 1:  # No esperar después del último lote
+                        time.sleep(2)
+                        
+                except Exception as e:
+                    logger.error(f"Error procesando lote {i+1}: {str(e)}")
+                    total_fallidos += len(lote)
+                    total_procesados += len(lote)
+                    
+                    # Crear registros fallidos para cada RUC del lote
+                    for ruc in lote:
+                        todos_resultados.append({
+                            'success': False,
+                            'ruc': ruc,
+                            'error': f"Error en lote: {str(e)}"
+                        })
+                    
+                    if batch_request:
+                        batch_request.failed_items += len(lote)
+                        batch_request.processed_items += len(lote)
+                        batch_request.save()
+                    
+                    # Continuar con el siguiente lote
+                    continue
+            
+            # Calcular estadísticas finales
+            activos = len([r for r in todos_resultados 
+                        if isinstance(r, dict) and r.get('success') and 
+                        r.get('estado_del_contribuyente') == 'ACTIVO'])
+            
+            habidos = len([r for r in todos_resultados 
+                        if isinstance(r, dict) and r.get('success') and 
+                        r.get('condicion_de_domicilio') == 'HABIDO'])
+            
+            # Actualizar batch request final si existe
+            if batch_request:
+                batch_request.results = {
+                    'successful': [r for r in todos_resultados if r.get('success')],
+                    'failed': [r for r in todos_resultados if not r.get('success')],
+                    'total': len(todos_resultados)
                 }
+                batch_request.processed_items = total_procesados
+                batch_request.successful_items = total_exitosos
+                batch_request.failed_items = total_fallidos
+                batch_request.status = 'COMPLETED' if total_fallidos == 0 else 'PARTIAL'
+                batch_request.completed_at = timezone.now()
+                batch_request.save()
             
+            # Retornar resultados consolidados
             return {
-                'success': False,
-                'error': 'Formato de respuesta inesperado',
-                'results': result
+                'success': True,
+                'total_requested': len(ruc_list),
+                'total_processed': total_procesados,
+                'successful': total_exitosos,
+                'failed': total_fallidos,
+                'results': todos_resultados,
+                'summary': {
+                    'activos': activos,
+                    'habidos': habidos,
+                },
+                'lotes_procesados': len(lotes),
+                'batch_id': batch_request.id if batch_request else None
             }
             
         except Exception as e:
+            # Manejar errores globales
             if batch_request:
                 batch_request.status = 'FAILED'
                 batch_request.error_summary = {'error': str(e)}
                 batch_request.completed_at = timezone.now()
                 batch_request.save()
-            raise
-    
-    def _make_request_with_tracking(self, endpoint_name, payload, batch_request=None):
+            
+            error_msg = f"Error en consulta masiva completa: {str(e)}"
+            error_msg += f"\nRUCs totales: {len(ruc_list)}"
+            error_msg += f"\nPrimeros RUCs: {ruc_list[:5] if len(ruc_list) > 5 else ruc_list}"
+            raise Exception(error_msg)
+
+    def consultar_ruc_masivo(self, ruc_list, batch_id=None):
         """
-        Versión extendida de _make_request con tracking de batch
+        Consulta masiva de RUCs (máximo 100 por llamada)
+        Args:
+            ruc_list: Lista de RUCs a consultar
+            batch_id: ID de ApiBatchRequest para tracking
+        Returns:
+            dict con resultados y estadísticas
         """
-        # Mismo código base de _make_request pero con actualizaciones de batch
-        # ... (similar al _make_request original) ...
+        # Validar y normalizar entrada
+        if not isinstance(ruc_list, list):
+            raise ValueError("ruc_list debe ser una lista")
         
-        # Dentro del try, después de obtener respuesta:
-        if batch_request:
-            batch_request.processed_items += 1
-            if response.status_code == 200 and response_data.get('success'):
-                batch_request.successful_items += 1
+        if len(ruc_list) > 100:
+            raise ValueError("Máximo 100 RUCs por consulta masiva")
+        
+        # Normalizar RUCs a strings y limpiar
+        cleaned_ruc_list = []
+        for ruc in ruc_list:
+            if isinstance(ruc, (int, float)):
+                ruc = str(int(ruc))  # Convertir números a string sin decimales
+            elif isinstance(ruc, str):
+                ruc = ruc.strip()  # Limpiar espacios
             else:
-                batch_request.failed_items += 1
-            batch_request.save()
+                raise ValueError(f"Tipo de dato no válido para RUC: {type(ruc)}")
+            
+            # Validar formato básico de RUC (11 dígitos para Perú)
+            if len(ruc) != 11 or not ruc.isdigit():
+                raise ValueError(f"RUC inválido: {ruc}. Debe tener 11 dígitos")
+            
+            cleaned_ruc_list.append(ruc)
         
-        # Resto de la lógica de _make_request...
+        # Registrar batch request si se proporciona batch_id
+        batch_request = None
+        if batch_id:
+            try:
+                batch_request = ApiBatchRequest.objects.get(id=batch_id)
+                batch_request.status = 'PROCESSING'
+                batch_request.total_items = len(cleaned_ruc_list)
+                batch_request.processed_items = 0
+                batch_request.successful_items = 0
+                batch_request.failed_items = 0
+                batch_request.save()
+            except ApiBatchRequest.DoesNotExist:
+                pass
+        
+        try:
+            # Usar el método _make_request existente para consistencia
+            result = self._make_request(
+                endpoint_name='consulta_ruc_masivo',
+                payload={'ruc': cleaned_ruc_list}
+            )
+            
+            # PROCESAR LA LISTA DIRECTAMENTE
+            if not isinstance(result, list):
+                # Si no es una lista, hubo un error
+                return {
+                    'success': False,
+                    'error': f'Formato de respuesta inesperado: {type(result)}',
+                    'total_requested': len(cleaned_ruc_list),
+                    'total_processed': 0,
+                    'successful': 0,
+                    'failed': len(cleaned_ruc_list),
+                    'results': [],
+                    'summary': {'activos': 0, 'habidos': 0},
+                    'batch_id': batch_request.id if batch_request else None
+                }
+            
+            # La API devolvió una lista de diccionarios
+            results_list = result
+            
+            # Clasificar resultados
+            successful_results = []
+            failed_results = []
+            
+            for item in results_list:
+                if isinstance(item, dict):
+                    # Para consultas masivas, el éxito está en la clave 'success'
+                    if item.get('success', False):
+                        successful_results.append(item)
+                    else:
+                        failed_results.append(item)
+                else:
+                    failed_results.append({'raw': item, 'success': False})
+            
+            # Calcular estadísticas
+            activos = len([r for r in successful_results if r.get('estado_del_contribuyente') == 'ACTIVO'])
+            habidos = len([r for r in successful_results if r.get('condicion_de_domicilio') == 'HABIDO'])
+            
+            # ✅ NUEVO: Análisis de facturación
+            analisis_facturacion = self._analizar_facturacion(results_list)
+            
+            # Actualizar batch request si existe
+            if batch_request:
+                batch_request.results = {
+                    'successful': successful_results,
+                    'failed': failed_results,
+                    'total': len(results_list),
+                    'analisis_facturacion': analisis_facturacion  # ✅ Agregar análisis
+                }
+                batch_request.processed_items = len(results_list)
+                batch_request.successful_items = len(successful_results)
+                batch_request.failed_items = len(failed_results)
+                batch_request.status = 'COMPLETED' if len(failed_results) == 0 else 'PARTIAL'
+                batch_request.completed_at = timezone.now()
+                batch_request.save()
+            
+            # Retornar estadísticas
+            return {
+                'success': True,
+                'total_requested': len(cleaned_ruc_list),
+                'total_processed': len(results_list),
+                'successful': len(successful_results),
+                'failed': len(failed_results),
+                'results': results_list,
+                'summary': {
+                    'activos': activos,
+                    'habidos': habidos,
+                },
+                'analisis_facturacion': analisis_facturacion, 
+                'batch_id': batch_request.id if batch_request else None
+            }
+                
+        except RateLimitExceededError as e:
+            # Manejar rate limit específicamente
+            if batch_request:
+                batch_request.status = 'FAILED'
+                batch_request.error_summary = {'error': 'Rate limit excedido', 'wait_time': e.wait_time}
+                batch_request.completed_at = timezone.now()
+                batch_request.save()
+            raise
+            
+        except Exception as e:
+            # Manejar otros errores
+            if batch_request:
+                batch_request.status = 'FAILED'
+                batch_request.error_summary = {'error': str(e)}
+                batch_request.completed_at = timezone.now()
+                batch_request.save()
+            
+            # Re-lanzar con contexto útil
+            error_msg = f"Error en consulta masiva de RUCs: {str(e)}"
+            error_msg += f"\nRUCs procesados: {len(cleaned_ruc_list)}"
+            error_msg += f"\nPrimeros RUCs: {cleaned_ruc_list[:3]}"
+            raise Exception(error_msg)
     
     def preparar_datos_facturacion_mensual(self, ruc_list):
         """
@@ -413,43 +967,52 @@ class MigoAPIClient:
             try:
                 batch_result = self.consultar_ruc_masivo(lote)
                 
-                for item in batch_result.get('results', []):
-                    ruc = item.get('ruc')
-                    
-                    if item.get('success'):
-                        estado = item.get('estado_del_contribuyente', '').upper()
-                        condicion = item.get('condicion_de_domicilio', '').upper()
+                if batch_result.get('success'):
+                    for item in batch_result.get('results', []):
+                        ruc = item.get('ruc')
                         
-                        cliente_data = {
-                            'ruc': ruc,
-                            'razon_social': item.get('nombre_o_razon_social'),
-                            'direccion': item.get('direccion'),
-                            'estado': estado,
-                            'condicion': condicion,
-                            'habido': condicion == 'HABIDO',
-                            'activo': estado == 'ACTIVO',
-                            'data_completa': item,
-                            'valido_para_facturar': estado == 'ACTIVO' and condicion == 'HABIDO'
-                        }
-                        
-                        if cliente_data['valido_para_facturar']:
-                            resultados['validos'].append(cliente_data)
-                        else:
-                            resultados['invalidos'].append({
+                        # Verificar si fue exitoso (basado en campo 'success')
+                        if isinstance(item, dict) and item.get('success', False):
+                            estado = item.get('estado_del_contribuyente', '').upper()
+                            condicion = item.get('condicion_de_domicilio', '').upper()
+                            
+                            cliente_data = {
                                 'ruc': ruc,
-                                'razon_social': cliente_data['razon_social'],
+                                'razon_social': item.get('nombre_o_razon_social'),
+                                'direccion': item.get('direccion'),
                                 'estado': estado,
                                 'condicion': condicion,
-                                'error': 'No activo o no habido'
+                                'habido': condicion == 'HABIDO',
+                                'activo': estado == 'ACTIVO',
+                                'data_completa': item,
+                                'valido_para_facturar': estado == 'ACTIVO' and condicion == 'HABIDO'
+                            }
+                            
+                            if cliente_data['valido_para_facturar']:
+                                resultados['validos'].append(cliente_data)
+                            else:
+                                resultados['invalidos'].append({
+                                    'ruc': ruc,
+                                    'razon_social': cliente_data['razon_social'],
+                                    'estado': estado,
+                                    'condicion': condicion,
+                                    'error': 'No activo o no habido'
+                                })
+                        else:
+                            resultados['advertencias'].append({
+                                'ruc': ruc,
+                                'error': 'Consulta fallida (success=False)'
                             })
-                    else:
+                else:
+                    # Si falló el lote completo
+                    for ruc in lote:
                         resultados['advertencias'].append({
                             'ruc': ruc,
-                            'error': 'No se pudo consultar en SUNAT'
+                            'error': batch_result.get('error', 'Error en consulta masiva')
                         })
                 
-                # Respetar rate limiting (60/minuto = 1 cada segundo)
-                time.sleep(1)
+                # Respetar rate limiting
+                time.sleep(2)  # Más tiempo para respetar límites
                 
             except Exception as e:
                 resultados['advertencias'].extend([
@@ -457,8 +1020,8 @@ class MigoAPIClient:
                     for ruc in lote
                 ])
         
-        return resultados    
-
+        return resultados
+    
     def _process_response(self, response, api_log, endpoint_name, duration_ms):
         """Procesa la respuesta HTTP y actualiza el log"""
         api_log.duration_ms = duration_ms
@@ -469,6 +1032,29 @@ class MigoAPIClient:
                 response_data = response.json()
                 api_log.response_data = response_data
                 
+                # CASO ESPECIAL: Para consulta_ruc_masivo, la respuesta es una lista
+                if endpoint_name == 'consulta_ruc_masivo':
+                    if isinstance(response_data, list):
+                        # Para consultas masivas, considerar éxito si obtenemos una lista
+                        # incluso si está vacía
+                        api_log.status = 'SUCCESS'
+                        api_log.save()
+                        
+                        # Actualizar rate limit
+                        rate_limit_obj = ApiRateLimit.objects.get(service=self.service)
+                        rate_limit_obj.increment_count()
+                        
+                        # Devolver la lista directamente
+                        return response_data
+                    else:
+                        # Si no es una lista, marcar como error
+                        error_msg = "Formato de respuesta inesperado para consulta masiva"
+                        api_log.status = 'FAILED'
+                        api_log.error_message = error_msg
+                        api_log.save()
+                        raise APIBadResponseError(error_msg)
+                
+                # CASO NORMAL: Para otros endpoints
                 if response_data.get('success'):
                     # ÉXITO
                     api_log.status = 'SUCCESS'

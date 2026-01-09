@@ -319,7 +319,14 @@ class ApiCallLog(models.Model):
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.service.name} - {self.status} - {self.created_at:%Y-%m-%d %H:%M}"
+         # Obtener datetime localizado
+        if timezone.is_aware(self.created_at):
+            local_time = timezone.localtime(self.created_at)
+        else:
+            local_time = self.created_at
+        time_str = local_time.strftime("%Y-%m-%d %H:%M:%S")
+        
+        return f"{self.service.name} - {self.status} - {time_str}"
     
     @property
     def was_successful(self):
