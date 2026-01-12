@@ -37,7 +37,7 @@ class Partner(TimeStampedModel):
         ],
         default="dni"
     )
-    num_document = models.CharField(max_length=20, unique=False, blank=True, null=True, verbose_name="Número de Documento")
+    num_document = models.CharField(max_length=20, unique=True, blank=True, null=True, verbose_name="Número de Documento")
     ref = models.CharField(max_length=64, unique=True, blank=True, null=True, verbose_name="Referencia Interna")
     website = models.URLField(blank=True, null=True, verbose_name="Sitio Web")
     comment = models.TextField(blank=True, null=True, verbose_name="Notas Adicionales")
@@ -135,7 +135,7 @@ class Currency(models.Model):
 
 class CurrencyRate(models.Model):
     currency = models.ForeignKey(Currency, on_delete=models.PROTECT, verbose_name="Moneda")
-    rate = models.DecimalField(max_digits=18, decimal_places=6, verbose_name="Tasa de Cambio")
+    # rate = models.DecimalField(max_digits=18, decimal_places=6, verbose_name="Tasa de Cambio")
     date_rate = models.DateField(default=timezone.now, verbose_name="Fecha de la Tasa")
     company = models.ForeignKey(Company, on_delete=models.PROTECT, verbose_name="Compañía")
     purchase_rate = models.DecimalField(max_digits=18, decimal_places=6, verbose_name="Tasa de Compra", default=0)
