@@ -7,9 +7,9 @@ from datetime import datetime, timedelta
 from django.core.cache import cache
 from django.utils import timezone
 from django.db import transaction
-from .models import ApiService, ApiEndpoint, ApiCallLog, ApiRateLimit, ApiBatchRequest
+from ..models import ApiService, ApiEndpoint, ApiCallLog, ApiRateLimit, ApiBatchRequest
 import requests
-from .exceptions import (
+from ..exceptions import (
     APIError, RateLimitExceededError, AuthenticationError,
     APINotFoundError, APIBadResponseError, APITimeoutError
 )
@@ -17,52 +17,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class CacheService:
-    """Servicio simple para cache en memoria"""
-    
-    @staticmethod
-    def generar_clave_cache(prefix, *args):
-        """Genera una clave de cache única"""
-        key_string = ":".join(str(arg) for arg in args)
-        hashed = hashlib.md5(key_string.encode()).hexdigest()[:16]
-        return f"cache:{prefix}:{hashed}"
-    
-    @staticmethod
-    def obtener_cache(clave, default=None, tiempo_expiracion=3600):
-        """Obtiene datos del cache"""
-        try:
-            cached_data = cache.get(clave)
-            if cached_data:
-                # Verificar si es un JSON string
-                if isinstance(cached_data, str):
-                    return json.loads(cached_data)
-                return cached_data
-        except Exception:
-            pass
-        return default
-    
-    @staticmethod
-    def guardar_cache(clave, data, tiempo_expiracion=3600):
-        """Guarda datos en el cache"""
-        try:
-            if isinstance(data, (dict, list)):
-                data = json.dumps(data, default=str)
-            cache.set(clave, data, tiempo_expiracion)
-            return True
-        except Exception as e:
-            print(f"Error guardando cache: {e}")
-            return False
-    
-    @staticmethod
-    def limpiar_cache(clave_pattern=None):
-        """Limpia el cache"""
-        if clave_pattern:
-            # Limpiar solo claves específicas
-            from django.core.cache import caches
-            default_cache = caches['default']
-            default_cache.delete_pattern(clave_pattern)
-        else:
-            cache.clear()
 
 class MigoAPIClient:
     """Cliente específico para APIMIGO con todas sus funcionalidades"""
@@ -76,7 +30,6 @@ class MigoAPIClient:
         self.base_url = self.service.base_url
         self.version = "1.0"  # Definir versión para User-Agent
         self.timeout = 30  # Definir timeout
-        self.cache_service = CacheService()
         
         # Mapeo de endpoints MIGO
         self.endpoints = {

@@ -5,7 +5,7 @@ from celery.result import allow_join_result
 from django.db import transaction
 from django.utils import timezone
 from .models import ApiBatchRequest, ApiService, ApiCallLog
-from .services import MigoAPIClient
+from .services.migo_service import MigoAPIClient
 import logging
 import json
 

@@ -9,7 +9,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myproject.settings')
 django.setup()
 
 # Ahora importamos los modelos
-from api_service.services import MigoAPIClient
+from myproject.api_service.services.migo_service import MigoAPIClient
 from api_service.models import ApiCallLog
 
 def test_conexion_basica():

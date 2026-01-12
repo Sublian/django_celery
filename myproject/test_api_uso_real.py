@@ -20,7 +20,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myproject.settings')
 django.setup()
 
-from api_service.services import MigoAPIClient
+from myproject.api_service.services.migo_service import MigoAPIClient
 from api_service.models import ApiCallLog, ApiService, ApiEndpoint
 from api_service.exceptions import RateLimitExceededError, APINotFoundError
 from django.utils import timezone

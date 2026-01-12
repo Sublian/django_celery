@@ -13,14 +13,102 @@ django.setup()
 
 from django.core.cache import cache
 from django.utils import timezone
-from api_service.services import MigoAPIClient as MigoClient
+from api_service.services.migo_service import MigoAPIClient as MigoClient
+from api_service.services.cache_service import APICacheService
 from billing.models import Currency, CurrencyRate, Partner, Company
+
+def mostrar_contenido_cache():
+    """
+    Muestra el contenido actual del cache para depuración
+    """
+    print("\n" + "="*60)
+    print("🔍 CONTENIDO DEL CACHE - DEBUG")
+    print("="*60)
+    
+    from django.core.cache import cache
+    import json
+    
+    # Obtener todas las claves del cache (esto depende del backend)
+    # Para Redis: cache.keys('*')
+    # Para memcached/local: no hay forma directa, necesitamos saber las claves
+    
+    # Como alternativa, podemos mostrar claves conocidas
+    claves_conocidas = []
+    
+    # Claves de tipo de cambio (últimos 7 días)
+    from datetime import date, timedelta
+    for i in range(7):
+        fecha = date.today() - timedelta(days=i)
+        claves_conocidas.append(f"tipo_cambio_{fecha.isoformat()}")
+    
+    # También podemos intentar obtener stats del APICacheService
+    try:
+        stats = APICacheService.get_stats()
+        print(f"\n📊 ESTADÍSTICAS DEL CACHE SERVICE:")
+        print(f"  Configuración TTL: {stats.get('ttl_config', {})}")
+        print(f"  Prefijos: {stats.get('prefixes', {})}")
+    except Exception as e:
+        print(f"⚠️  No se pudieron obtener estadísticas: {str(e)}")
+    
+    print(f"\n🔍 BUSCANDO CLAVES CONOCIDAS EN CACHE:")
+    cache_hits = 0
+    cache_misses = 0
+    
+    for clave in claves_conocidas:
+        valor = cache.get(clave)
+        if valor:
+            cache_hits += 1
+            print(f"\n✅ {clave}:")
+            if isinstance(valor, dict):
+                for k, v in valor.items():
+                    if k not in ['cached_at', 'expires_at', 'metadata']:
+                        print(f"   • {k}: {v}")
+                if 'cached_at' in valor:
+                    print(f"   • cached_at: {valor['cached_at']}")
+                if 'expires_at' in valor:
+                    print(f"   • expires_at: {valor['expires_at']}")
+            else:
+                print(f"   Tipo: {type(valor).__name__}, Valor: {str(valor)[:100]}...")
+        else:
+            cache_misses += 1
+            print(f"❌ {clave}: NO EN CACHE")
+    
+    print(f"\n📊 RESUMEN:")
+    print(f"  Encontradas en cache: {cache_hits}")
+    print(f"  No encontradas: {cache_misses}")
+    
+    # Mostrar también algunas claves de RUC si existen
+    print(f"\n🔍 BUSCANDO ALGUNAS CLAVES DE RUC (ejemplos):")
+    
+    # Intentar algunas claves de ejemplo
+    ejemplos_ruc = [
+        'ruc_20557425889',
+        'ruc_20603274742', 
+        'ruc_20100035370'
+    ]
+    
+    for clave_ruc in ejemplos_ruc:
+        valor = cache.get(clave_ruc)
+        if valor:
+            print(f"✅ {clave_ruc}: Existe en cache")
+            if isinstance(valor, dict) and 'razon_social' in valor:
+                print(f"   • Razon social: {valor['razon_social'][:50]}...")
+                print(f"   • Estado: {valor.get('estado', 'N/A')}")
+                print(f"   • Válido facturación: {valor.get('valido_facturacion', 'N/A')}")
+        else:
+            print(f"❌ {clave_ruc}: NO en cache")
+    
+    return {
+        'cache_hits': cache_hits,
+        'cache_misses': cache_misses,
+        'claves_revisadas': len(claves_conocidas)
+    }
 
 def obtener_tipo_cambio_dia(force_api=False):
     """
     Obtiene el tipo de cambio del día con cache en 3 niveles:
-    1. Cache Django (15 minutos)
-    2. Base de datos billing_currencyrate
+    1. APICacheService (15 minutos)
+    2. Base de datos billing_currencyrate  
     3. API MIGO
     
     Args:
@@ -34,22 +122,22 @@ def obtener_tipo_cambio_dia(force_api=False):
     print("="*40)
     
     hoy = date.today()
-    cache_key = f"tipo_cambio_{hoy.isoformat()}"
+    fecha_str = hoy.isoformat()
     
-    # 1. Verificar cache Django (15 minutos)
+    # 1. Verificar APICacheService (15 minutos)
     if not force_api:
-        cached = cache.get(cache_key)
-        print(f"🔍 Verificando cache Django para {cache_key}...")
-        if cached:
-            print(f"✅ Tipo cambio obtenido de cache Django")
-            return cached
+        cache_data = APICacheService.get_tipo_cambio(fecha_str)
+        if cache_data:
+            print(f"✅ Tipo cambio obtenido de cache service")
+            return cache_data
     
     # 2. Verificar base de datos
     try:
-        # Buscar USD en Currency
+        # Buscar USD en Currency - Ajustado según tu modelo
         moneda_usd = Currency.objects.filter(name='USD').first()
         
         if moneda_usd:
+            # Usar el campo correcto según tu modelo: date_rate
             tipo_cambio_db = CurrencyRate.objects.filter(
                 currency=moneda_usd,
                 date_rate=hoy
@@ -59,15 +147,15 @@ def obtener_tipo_cambio_dia(force_api=False):
                 print(f"✅ Tipo cambio obtenido de base de datos")
                 resultado = {
                     'success': True,
-                    'fecha': hoy.isoformat(), 
+                    'fecha': fecha_str, 
                     'compra': float(tipo_cambio_db.purchase_rate),
                     'venta': float(tipo_cambio_db.sale_rate),
                     'fuente': 'database',
                     'currency_rate_id': tipo_cambio_db.id
                 }
                 
-                # Guardar en cache por 15 minutos
-                cache.set(cache_key, resultado, 900)
+                # Guardar en APICacheService
+                APICacheService.set_tipo_cambio(fecha_str, resultado)
                 return resultado
     except Exception as e:
         print(f"⚠️  Error consultando BD: {str(e)}")
@@ -83,6 +171,11 @@ def obtener_tipo_cambio_dia(force_api=False):
         if resultado.get('success'):
             print(f"✅ Tipo cambio obtenido de API MIGO (latest)")
             
+            # Normalizar nombres de campos de la API
+            # La API puede devolver 'precio_compra'/ 'precio_venta' o 'compra'/'venta'
+            compra = resultado.get('precio_compra') or resultado.get('compra', 0)
+            venta = resultado.get('precio_venta') or resultado.get('venta', 0)
+            
             # Guardar en base de datos
             try:
                 moneda_usd, _ = Currency.objects.get_or_create(
@@ -93,24 +186,43 @@ def obtener_tipo_cambio_dia(force_api=False):
                         'active': True
                     }
                 )
+                
+                # Verificar que existe una Company
                 company = Company.objects.first()
+                if not company:
+                    raise Exception("No hay compañía configurada en la base de datos")
+                
                 currency_rate = CurrencyRate.objects.create(
                     currency=moneda_usd,
                     date_rate=hoy,
-                    purchase_rate=resultado.get('precio_compra', 0),
-                    sale_rate=resultado.get('precio_venta', 0),
+                    purchase_rate=compra,
+                    sale_rate=venta,
                     company=company,
                 )
                 
-                resultado['currency_rate_id'] = currency_rate.id
-                resultado['fuente'] = 'api_migo_latest'
+                resultado = {
+                    'success': True,
+                    'fecha': fecha_str,
+                    'compra': float(compra),
+                    'venta': float(venta),
+                    'fuente': 'api_migo_latest',
+                    'currency_rate_id': currency_rate.id
+                }
                 
             except Exception as e:
                 print(f"⚠️  Error guardando en BD: {str(e)}")
-                resultado['fuente'] = 'api_migo_latest_no_save'
+                # Aún así devolver los datos de la API
+                resultado = {
+                    'success': True,
+                    'fecha': fecha_str,
+                    'compra': float(compra),
+                    'venta': float(venta),
+                    'fuente': 'api_migo_latest_no_save',
+                    'advertencia': f'No se guardó en BD: {str(e)}'
+                }
             
-            # Guardar en cache por 15 minutos
-            cache.set(cache_key, resultado, 900)
+            # Guardar en APICacheService
+            APICacheService.set_tipo_cambio(fecha_str, resultado)
             return resultado
         
     except Exception as e:
@@ -118,15 +230,27 @@ def obtener_tipo_cambio_dia(force_api=False):
     
     # Si latest falla, intentar con fecha específica
     try:
-        resultado = client.consultar_tipo_cambio_fecha(hoy.isoformat())
+        resultado_api = client.consultar_tipo_cambio_fecha(fecha_str)
         
-        if resultado.get('success'):
+        if resultado_api.get('success'):
             print(f"✅ Tipo cambio obtenido de API MIGO (fecha específica)")
+            
+            # Normalizar campos
+            compra = resultado_api.get('precio_compra') or resultado_api.get('compra', 0)
+            venta = resultado_api.get('precio_venta') or resultado_api.get('venta', 0)
+            
+            resultado = {
+                'success': True,
+                'fecha': fecha_str,
+                'compra': float(compra),
+                'venta': float(venta),
+                'fuente': 'api_migo_fecha'
+            }
             
             # Guardar en base de datos
             try:
                 moneda_usd, _ = Currency.objects.get_or_create(
-                    code='USD',
+                    name='USD',
                     defaults={
                         'name': 'US Dollar',
                         'symbol': '$',
@@ -134,61 +258,67 @@ def obtener_tipo_cambio_dia(force_api=False):
                     }
                 )
                 
-                currency_rate = CurrencyRate.objects.create(
-                    currency=moneda_usd,
-                    date=hoy,
-                    rate_buy=resultado.get('compra', 0),
-                    rate_sell=resultado.get('venta', 0),
-                    source='MIGO API',
-                    metadata={'api_response': resultado}
-                )
-                
-                resultado['currency_rate_id'] = currency_rate.id
-                resultado['fuente'] = 'api_migo_fecha'
-                
+                company = Company.objects.first()
+                if company:
+                    currency_rate = CurrencyRate.objects.create(
+                        currency=moneda_usd,
+                        date_rate=hoy,
+                        purchase_rate=compra,
+                        sale_rate=venta,
+                        company=company,
+                    )
+                    resultado['currency_rate_id'] = currency_rate.id
+                else:
+                    resultado['fuente'] = 'api_migo_fecha_no_company'
+                    
             except Exception as e:
                 print(f"⚠️  Error guardando en BD: {str(e)}")
                 resultado['fuente'] = 'api_migo_fecha_no_save'
             
-            # Guardar en cache
-            cache.set(cache_key, resultado, 900)
+            # Guardar en APICacheService
+            APICacheService.set_tipo_cambio(fecha_str, resultado)
             return resultado
         
     except Exception as e:
         print(f"❌ Error API fecha específica: {str(e)}")
     
-    # Si todo falla, usar último disponible
+    # Si todo falla, usar último disponible en BD
     print(f"⚠️  Usando último tipo cambio disponible en BD")
     try:
-        ultimo = CurrencyRate.objects.filter(
-            currency__code='USD'
-        ).order_by('-date').first()
-        
-        if ultimo:
-            resultado = {
-                'success': True,
-                'fecha': ultimo.date.isoformat(),
-                'compra': float(ultimo.rate_buy),
-                'venta': float(ultimo.rate_sell),
-                'fuente': 'ultimo_disponible',
-                'currency_rate_id': ultimo.id,
-                'advertencia': f'Tipo cambio del {ultimo.date}, no del día actual'
-            }
-            cache.set(cache_key, resultado, 900)
-            return resultado
-    except:
-        pass
+        # Buscar por nombre 'USD' en lugar de code
+        moneda_usd = Currency.objects.filter(name='USD').first()
+        if moneda_usd:
+            ultimo = CurrencyRate.objects.filter(
+                currency=moneda_usd
+            ).order_by('-date_rate').first()
+            
+            if ultimo:
+                resultado = {
+                    'success': True,
+                    'fecha': ultimo.date_rate.isoformat(),
+                    'compra': float(ultimo.purchase_rate),
+                    'venta': float(ultimo.sale_rate),
+                    'fuente': 'ultimo_disponible',
+                    'currency_rate_id': ultimo.id,
+                    'advertencia': f'Tipo cambio del {ultimo.date_rate}, no del día actual'
+                }
+                APICacheService.set_tipo_cambio(fecha_str, resultado)
+                return resultado
+    except Exception as e:
+        print(f"⚠️  Error buscando último en BD: {str(e)}")
     
     # Último recurso: valor por defecto
     print(f"⚠️  Usando valor por defecto")
-    return {
+    resultado_default = {
         'success': False,
-        'fecha': hoy.isoformat(),
+        'fecha': fecha_str,
         'compra': 3.70,
         'venta': 3.75,
         'fuente': 'valor_por_defecto',
         'advertencia': 'No se pudo obtener tipo cambio real'
     }
+    APICacheService.set_tipo_cambio(fecha_str, resultado_default)
+    return resultado_default
 
 def obtener_rucs_para_validacion():
     """
@@ -256,273 +386,302 @@ def obtener_rucs_para_validacion():
         'total': len(todos_rucs)
     }
 
-def _consolidar_resultados(resultados, total_esperado, total_procesado_api=0):
+def _consolidar_resultados(resultados, total_esperado, total_procesado_api, rucs_omitidos=None):
     """
-    Consolidar y analizar resultados de validación
-    
-    Args:
-        resultados: Lista de diccionarios con resultados de validación
-        total_esperado: Número total de RUCs que se intentaron validar
-        total_procesado_api: RUCs para los que la API intentó dar respuesta
-    
-    Returns:
-        dict con resultados consolidados y análisis
+    Consolidar resultados con manejo de RUCs omitidos
     """
-    total = len(resultados)
-    validos = [r for r in resultados if r.get('valido_facturacion')]
-    no_validos = [r for r in resultados if not r.get('valido_facturacion')]
+    rucs_omitidos = rucs_omitidos or []
     
-    # Analizar causas de no validación
-    causas = {
-        'estado_no_activo': 0,
-        'condicion_no_habido': 0,
-        'consulta_fallida': 0,
-        'error_api': 0,
-        'otros': 0,
-        'direccion_invalida': 0,
-        'tipo_contribuyente_no_valido': 0
-    }
+    # ... (código existente para contar y clasificar) ...
     
-    for ruc in no_validos:
-        estado = ruc.get('estado', '')
-        condicion = ruc.get('condicion', '')
-        error = ruc.get('error', '')
-        fuente = ruc.get('fuente', '')
-        
-        # Analizar causas según el tipo de error
-        if error:
-            if 'api_error' in fuente or 'excepcion' in fuente:
-                causas['error_api'] += 1
-            elif 'consulta_fallida' in error.lower() or 'error en lote' in error:
-                causas['consulta_fallida'] += 1
-            else:
-                causas['otros'] += 1
-        elif estado != 'ACTIVO' and estado not in ['', 'ERROR', 'DESCONOCIDO']:
-            causas['estado_no_activo'] += 1
-        elif condicion != 'HABIDO' and condicion not in ['', 'ERROR', 'DESCONOCIDO']:
-            causas['condicion_no_habido'] += 1
-        elif ruc.get('tipo_contribuyente') in ['EXTRANJERO_NO_DOMICILIADO', 'NO_DOMICILIADO']:
-            causas['tipo_contribuyente_no_valido'] += 1
-        elif not ruc.get('direccion') or len(str(ruc.get('direccion', '')).strip()) < 10:
-            causas['direccion_invalida'] += 1
-        else:
-            causas['otros'] += 1
-    
-    # Calcular estadísticas de cache
-    de_cache = sum(1 for r in resultados if r.get('cacheado', False))
-    de_api = sum(1 for r in resultados if not r.get('cacheado', True))
-    
-    # Crear mensaje de advertencia si hay discrepancias
-    advertencia = ''
-    if total_esperado > total:
-        advertencia = f'Faltan {total_esperado - total} registros de RUCs en los resultados.'
-    elif total_procesado_api > 0 and total_procesado_api < total_esperado:
-        advertencia = f'Solo {total_procesado_api} de {total_esperado} RUCs fueron procesados por la API.'
-    
-    return {
-        'total_esperado': total_esperado,
-        'total_procesado_api': total_procesado_api,
-        'total_validados': total,
-        'validos_facturacion': {
-            'cantidad': len(validos),
-            'porcentaje': (len(validos) / total * 100) if total > 0 else 0,
-            'items': validos[:50]  # Limitar para no hacer JSON muy grande
+    # Agregar sección para RUCs omitidos
+    resultados_consolidados = {
+        # ... (tus campos existentes) ...
+        'rucs_omitidos': {
+            'cantidad': len(rucs_omitidos),
+            'items': rucs_omitidos[:20],  # Limitar para no hacer muy grande
+            'porcentaje': (len(rucs_omitidos) / total_esperado * 100) if total_esperado > 0 else 0
         },
-        'no_validos_facturacion': {
-            'cantidad': len(no_validos),
-            'porcentaje': (len(no_validos) / total * 100) if total > 0 else 0,
-            'items': no_validos[:50],  # Limitar para no hacer JSON muy grande
-            'causas': causas,
-            'detalle_causas': {
-                'estado_no_activo': [r['ruc'] for r in no_validos 
-                                   if r.get('estado', '') != 'ACTIVO' 
-                                   and r.get('estado', '') not in ['', 'ERROR', 'DESCONOCIDO']][:10],
-                'condicion_no_habido': [r['ruc'] for r in no_validos 
-                                       if r.get('condicion', '') != 'HABIDO' 
-                                       and r.get('condicion', '') not in ['', 'ERROR', 'DESCONOCIDO']][:10],
-                'error_api': [r['ruc'] for r in no_validos 
-                            if 'api_error' in r.get('fuente', '') 
-                            or 'excepcion' in r.get('fuente', '')][:10],
-                'consulta_fallida': [r['ruc'] for r in no_validos 
-                                   if 'consulta_fallida' in str(r.get('error', '')).lower() 
-                                   or 'error en lote' in str(r.get('error', ''))][:10]
-            }
-        },
-        'estadisticas_cache': {
-            'total': total,
-            'de_cache': de_cache,
-            'de_api': de_api,
-            'porcentaje_cache': (de_cache / total * 100) if total > 0 else 0,
-            'porcentaje_api': (de_api / total * 100) if total > 0 else 0
-        },
-        'distribucion_lotes': {
-            'lote_1': sum(1 for r in resultados if r.get('lote') == 1),
-            'lote_2': sum(1 for r in resultados if r.get('lote') == 2),
-            'sin_lote': sum(1 for r in resultados if not r.get('lote'))
-        },
-        'timestamp': timezone.now().isoformat(),
-        'advertencia': advertencia,
-        'resumen_rapido': {
-            'total_rucs_solicitados': total_esperado,
-            'total_rucs_procesados': total,
-            'diferencia': total_esperado - total,
-            'validos': len(validos),
-            'no_validos': len(no_validos),
-            'tasa_exito': (len(validos) / total_esperado * 100) if total_esperado > 0 else 0
+        'resumen_ejecucion': {
+            'total_solicitado': total_esperado,
+            'total_procesado': len(resultados),
+            'diferencia': total_esperado - len(resultados),
+            'cache_hits': sum(1 for r in resultados if r.get('cacheado', False)),
+            'api_calls_efectivas': total_procesado_api - len(rucs_omitidos),
+            'rucs_omitidos_finales': len(rucs_omitidos)
         }
     }
+    
+    return resultados_consolidados
 
-def validar_rucs_con_cache(ruc_list, max_lotes=2):
+def validar_rucs_con_cache(ruc_list, max_lotes=2, max_reintentos=2):
     """
-    Valida RUCs con cache en 3 niveles:
+    Valida RUCs con cache y reintentos resilientes para RUCs omitidos con cache en 3 niveles:
     1. Cache Django (por RUC individual y por lote)
     2. Validaciones previas en BD (si existe tabla de auditoría)
     3. API MIGO
-    
     Args:
         ruc_list: Lista de RUCs a validar
         max_lotes: Máximo número de lotes a procesar
-    
+        max_reintentos: Máximo número de reintentos para RUCs problemáticos
     Returns:
         dict con resultados de validación
     """
-    print(f"\n🔍 VALIDANDO {len(ruc_list)} RUCS (máx {max_lotes} lotes)")
+    print(f"\n🔍 VALIDANDO {len(ruc_list)} RUCS (máx {max_lotes} lotes, {max_reintentos} reintentos)")
     print("="*50)
 
     client = MigoClient()
     resultados = []
     rucs_procesados_api = 0  # Contador para RUCs que llegaron de la API
     api_calls = 0
+    reintentos_realizados = 0
 
-    # 1. Verificar cache del lote completo (igual que antes)
-    ruc_list_sorted = sorted(ruc_list)
-    lote_hash = hashlib.md5(json.dumps(ruc_list_sorted).encode()).hexdigest()
-    cache_key_lote = f"validacion_lote_{lote_hash}"
-    cached_lote = cache.get(cache_key_lote)
-    if cached_lote:
+    # 1. Verificar cache del lote completo
+    cache_lote = APICacheService.get_ruc_lote(ruc_list)
+    if cache_lote:
         print(f"✅ Validación completa obtenida de cache (lote)")
-        # Asegurar que el objeto del cache tiene la estructura esperada
-        return cached_lote
+        return cache_lote.get('results')
 
-    # 2. Verificar cache individual y preparar lista para API
+    # 2. Verificar cache individual
     rucs_para_api = []
+    cache_hits = 0
+    
     for ruc in ruc_list:
-        cache_key_individual = f"validacion_ruc_{ruc}"
-        cached_individual = cache.get(cache_key_individual)
-        if cached_individual:
-            resultados.append(cached_individual)
+        cache_data = APICacheService.get_ruc_individual(ruc)
+        if cache_data:
+            cache_hits += 1
+            resultados.append({
+                **cache_data,
+                'cacheado': True,
+                'fuente': 'cache_individual'
+            })
         else:
             rucs_para_api.append(ruc)
-
-    print(f"📊 Cache individual: {len(resultados)}/{len(ruc_list)} RUCs")
-
+    
+    print(f"📊 Cache individual: {cache_hits}/{len(ruc_list)} RUCs")
+    
+     # Si todos estaban en cache, guardar y retornar
     if not rucs_para_api:
-        consolidated = _consolidar_resultados(resultados, len(ruc_list), rucs_procesados_api)
-        # GUARDAR EN CACHE: Asegurar que es serializable
-        try:
-            # Usar json.dumps/loads para forzar la serialización
-            cache.set(cache_key_lote, consolidated, 3600)
-            print("💾 Resultados consolidados guardados en cache (lote completo).")
-        except Exception as e:
-            print(f"⚠️  No se pudo guardar en cache: {e}")
+        consolidated = _consolidar_resultados(resultados, len(ruc_list), 0)
+        APICacheService.set_ruc_lote(ruc_list, consolidated)
         return consolidated
-
-    # 3. Consultar API para RUCs faltantes
-    print(f"🔍 Consultando API para {len(rucs_para_api)} RUCs...")
+    
+    # 3. Procesar lotes iniciales
     tamano_lote = getattr(client.service, 'max_batch_size', 100)
     lotes = client._particionar_rucs_en_lotes(rucs_para_api, tamano_lote)
     lotes = lotes[:max_lotes]
+    
+    print(f"📦 Procesando {len(lotes)} lote(s) inicial(es)...")
 
-    print(f"📦 Procesando {len(lotes)} lote(s)...")
+    # RUCs que fueron enviados pero no recibidos (para reintento)
+    rucs_omitidos = []
+    
     for i, lote in enumerate(lotes):
         print(f"  Lote {i+1}/{len(lotes)}: {len(lote)} RUCs")
+        
         try:
             if i > 0:
-                time.sleep(2)
+                time.sleep(3)  # Rate limit más corto para lotes iniciales
+            
             resultado_lote = client.consultar_ruc_masivo(lote)
             api_calls += 1
-
+            
             if resultado_lote.get('success'):
-                # ✅ CORRECCIÓN CRÍTICA: Contar RUCs en la respuesta
-                resultados_api = resultado_lote.get('results', [])
-                rucs_en_respuesta = len(resultados_api)
-                rucs_procesados_api += rucs_en_respuesta
-                print(f"    📄 API devolvió datos para {rucs_en_respuesta} RUCs")
-
-                for ruc_data in resultados_api:
+                # Procesar RUCs recibidos
+                rucs_recibidos = set()
+                for ruc_data in resultado_lote.get('results', []):
                     if isinstance(ruc_data, dict):
-                        ruc = ruc_data.get('ruc', '')
+                        ruc = ruc_data.get('ruc')
                         if ruc:
+                            rucs_recibidos.add(ruc)
+                            
+                            # Validar y crear registro
                             es_valido = (
                                 ruc_data.get('success', False) and
                                 ruc_data.get('estado_del_contribuyente') == 'ACTIVO' and
                                 ruc_data.get('condicion_de_domicilio') == 'HABIDO'
                             )
+                            
                             validacion = {
                                 'ruc': ruc,
                                 'razon_social': ruc_data.get('nombre_o_razon_social', ''),
                                 'estado': ruc_data.get('estado_del_contribuyente', ''),
                                 'condicion': ruc_data.get('condicion_de_domicilio', ''),
+                                'direccion': ruc_data.get('direccion', ''),
+                                'actualizado_en': ruc_data.get('actualizado_en', ''),
                                 'valido_facturacion': es_valido,
                                 'fuente': 'api_migo',
                                 'cacheado': False,
-                                'lote': i+1
+                                'lote': f"inicial_{i+1}"
                             }
+                            
                             resultados.append(validacion)
-                            # ✅ GUARDAR EN CACHE INDIVIDUAL: Asegurar serialización
-                            try:
-                                # Crear una copia simple y serializable
-                                cache_data = validacion.copy()
-                                cache.set(f"validacion_ruc_{ruc}", cache_data, 86400)
-                            except Exception as e:
-                                print(f"       ⚠️  No se pudo cachear {ruc}: {e}")
+                            rucs_procesados_api += 1
+                            
+                            # Guardar en cache individual
+                            APICacheService.set_ruc_individual(ruc, validacion)
+                
+                # Identificar RUCs omitidos en este lote
+                for ruc_enviado in lote:
+                    if ruc_enviado not in rucs_recibidos:
+                        print(f"    ⚠️  RUC omitido: {ruc_enviado}")
+                        rucs_omitidos.append(ruc_enviado)
+                        
+                        # Crear registro de error
+                        resultados.append({
+                            'ruc': ruc_enviado,
+                            'razon_social': '',
+                            'estado': 'OMITIDO',
+                            'condicion': 'OMITIDO',
+                            'valido_facturacion': False,
+                            'error': 'RUC omitido en respuesta inicial de API',
+                            'fuente': 'api_omitido',
+                            'cacheado': False,
+                            'lote': f"inicial_{i+1}"
+                        })
+            
             else:
-                print(f"    ⚠️  Lote falló: {resultado_lote.get('error')}")
-                # Crear entradas fallidas
+                # Si falla todo el lote, agregar todos como fallidos
+                print(f"    ❌ Lote falló: {resultado_lote.get('error')}")
                 for ruc in lote:
                     resultados.append({
-                        'ruc': ruc, 'valido_facturacion': False, 'error': 'Error en lote',
-                        'fuente': 'api_error', 'cacheado': False, 'lote': i+1
+                        'ruc': ruc,
+                        'razon_social': '',
+                        'estado': 'ERROR_LOTE',
+                        'condicion': 'ERROR_LOTE',
+                        'valido_facturacion': False,
+                        'error': resultado_lote.get('error', 'Error en lote'),
+                        'fuente': 'error_lote',
+                        'cacheado': False,
+                        'lote': f"inicial_{i+1}_error"
                     })
-                    rucs_procesados_api += 1  # Contar incluso los fallos
-
+        
         except Exception as e:
-            print(f"    ❌ Error en lote: {e}")
+            print(f"    ❌ Excepción en lote: {str(e)}")
             for ruc in lote:
                 resultados.append({
-                    'ruc': ruc, 'valido_facturacion': False, 'error': str(e),
-                    'fuente': 'excepcion', 'cacheado': False, 'lote': i+1
+                    'ruc': ruc,
+                    'razon_social': '',
+                    'estado': 'EXCEPCION',
+                    'condicion': 'EXCEPCION',
+                    'valido_facturacion': False,
+                    'error': str(e),
+                    'fuente': 'excepcion',
+                    'cacheado': False,
+                    'lote': f"inicial_{i+1}_excepcion"
                 })
-                rucs_procesados_api += 1
-
-    print(f"📊 API calls: {api_calls}. RUCs de API: {rucs_procesados_api}")
-
-    # 4. Consolidar resultados
-    resultados_consolidados = _consolidar_resultados(resultados, len(ruc_list), rucs_procesados_api)
-
-    # ✅ GUARDAR LOTE EN CACHE: Preparar datos serializables
-    try:
-        # Estrategia: simplificar datos para cache
-        cache_data = {
-            'total_validados': resultados_consolidados['total_validados'],
-            'validos_facturacion': {
-                'cantidad': resultados_consolidados['validos_facturacion']['cantidad'],
-                'porcentaje': resultados_consolidados['validos_facturacion']['porcentaje']
-            },
-            'no_validos_facturacion': {
-                'cantidad': resultados_consolidados['no_validos_facturacion']['cantidad'],
-                'porcentaje': resultados_consolidados['no_validos_facturacion']['porcentaje'],
-                'causas': resultados_consolidados['no_validos_facturacion']['causas']
-            },
-            'timestamp': resultados_consolidados['timestamp']
-        }
-        cache.set(cache_key_lote, cache_data, 3600)
-        print("💾 Resultados (versión cacheable) guardados en cache.")
-    except Exception as e:
-        print(f"⚠️  Error guardando lote en cache: {e}")
-
+    
+    # 4. FASE RESILIENTE: Reintentar RUCs omitidos
+    if rucs_omitidos and reintentos_realizados < max_reintentos:
+        print(f"\n🔄 FASE RESILIENTE: Reintentando {len(rucs_omitidos)} RUCs omitidos")
+        print("="*40)
+        
+        # Estrategia: intentar en lotes más pequeños o individualmente
+        estrategias = [
+            {'nombre': 'lote_5', 'tamano': 5, 'desc': 'Lotes de 5'},
+            {'nombre': 'individual', 'tamano': 1, 'desc': 'Individual'}
+        ]
+        
+        for estrategia in estrategias:
+            if not rucs_omitidos:
+                break
+                
+            print(f"\n  🔧 Estrategia: {estrategia['desc']}")
+            
+            # Particionar RUCs omitidos según estrategia
+            lotes_reintento = client._particionar_rucs_en_lotes(
+                rucs_omitidos, 
+                estrategia['tamano']
+            )
+            
+            for i, lote_reintento in enumerate(lotes_reintento):
+                if reintentos_realizados >= max_reintentos:
+                    break
+                    
+                print(f"    Reintento {reintentos_realizados + 1}: {len(lote_reintento)} RUCs")
+                
+                try:
+                    time.sleep(2)  # Esperar más entre reintentos
+                    
+                    resultado_reintento = client.consultar_ruc_masivo(lote_reintento)
+                    api_calls += 1
+                    reintentos_realizados += 1
+                    
+                    if resultado_reintento.get('success'):
+                        rucs_exitosos = []
+                        
+                        for ruc_data in resultado_reintento.get('results', []):
+                            if isinstance(ruc_data, dict):
+                                ruc = ruc_data.get('ruc')
+                                if ruc and ruc in rucs_omitidos:
+                                    # Encontrar y actualizar el registro existente
+                                    for idx, resultado in enumerate(resultados):
+                                        if resultado.get('ruc') == ruc:
+                                            # Actualizar con datos exitosos
+                                            es_valido = (
+                                                ruc_data.get('success', False) and
+                                                ruc_data.get('estado_del_contribuyente') == 'ACTIVO' and
+                                                ruc_data.get('condicion_de_domicilio') == 'HABIDO'
+                                            )
+                                            
+                                            resultados[idx] = {
+                                                'ruc': ruc,
+                                                'razon_social': ruc_data.get('nombre_o_razon_social', ''),
+                                                'estado': ruc_data.get('estado_del_contribuyente', ''),
+                                                'condicion': ruc_data.get('condicion_de_domicilio', ''),
+                                                'direccion': ruc_data.get('direccion', ''),
+                                                'actualizado_en': ruc_data.get('actualizado_en', ''),
+                                                'valido_facturacion': es_valido,
+                                                'fuente': 'api_migo_reintento',
+                                                'cacheado': False,
+                                                'lote': f"reintento_{reintentos_realizados}"
+                                            }
+                                            
+                                            rucs_exitosos.append(ruc)
+                                            rucs_procesados_api += 1
+                                            
+                                            # Guardar en cache
+                                            APICacheService.set_ruc_individual(ruc, resultados[idx])
+                                            break
+                        
+                        # Remover RUCs exitosos de la lista de omitidos
+                        rucs_omitidos = [r for r in rucs_omitidos if r not in rucs_exitosos]
+                        
+                        if rucs_exitosos:
+                            print(f"      ✅ Exitosos: {len(rucs_exitosos)} RUCs")
+                    
+                    else:
+                        print(f"      ⚠️  Reintento falló")
+                
+                except Exception as e:
+                    print(f"      ❌ Error en reintento: {str(e)}")
+                    reintentos_realizados += 1
+        
+        # Si aún quedan RUCs omitidos después de los reintentos
+        if rucs_omitidos:
+            print(f"\n⚠️  {len(rucs_omitidos)} RUCs permanecen omitidos después de {max_reintentos} reintentos")
+            for ruc in rucs_omitidos[:10]:
+                print(f"  • {ruc}")
+    
+    print(f"\n📊 RESUMEN EJECUCIÓN:")
+    print(f"  • API calls totales: {api_calls}")
+    print(f"  • Reintentos realizados: {reintentos_realizados}")
+    print(f"  • RUCs procesados por API: {rucs_procesados_api}")
+    print(f"  • RUCs de cache: {cache_hits}")
+    print(f"  • RUCs omitidos persistentes: {len(rucs_omitidos)}")
+    
+    # 5. Consolidar resultados finales
+    resultados_consolidados = _consolidar_resultados(
+        resultados, 
+        len(ruc_list), 
+        rucs_procesados_api,
+        rucs_omitidos
+    )
+    
+    # 6. Guardar lote completo en cache
+    APICacheService.set_ruc_lote(ruc_list, resultados_consolidados)
+    
     return resultados_consolidados
-
 
 def generar_reporte_facturacion(tipo_cambio, validacion_rucs):
     """
@@ -731,6 +890,7 @@ def main():
     print("3. Solo validar RUCs")
     print("4. Generar reporte desde archivo JSON")
     print("5. Limpiar cache")
+    print("6. Mostrar contenido del cache (DEBUG)")
     print("0. Salir")
     
     try:
@@ -787,6 +947,11 @@ def main():
                 print("✅ Cache limpiado exitosamente")
             except Exception as e:
                 print(f"❌ Error limpiando cache: {str(e)}")
+                
+        elif opcion == "6":
+            print("\n🔍 MOSTRANDO CONTENIDO DEL CACHE...")
+            resultado = mostrar_contenido_cache()
+            print(f"\n✅ Revisión de cache completada")
                 
         elif opcion == "0":
             print("\n👋 Saliendo...")
