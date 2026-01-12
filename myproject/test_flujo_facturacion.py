@@ -17,6 +17,118 @@ from api_service.services.migo_service import MigoAPIClient as MigoClient
 from api_service.services.cache_service import APICacheService
 from billing.models import Currency, CurrencyRate, Partner, Company
 
+# Añade esta función para debug profundo del cache
+def debug_cache_detallado():
+    """Debug completo del sistema de cache"""
+    print("\n" + "="*60)
+    print("🔍 DEBUG PROFUNDO DEL CACHE")
+    print("="*60)
+    
+    from django.core.cache import cache
+    import django
+    
+    # 1. Información del backend
+    print("\n📊 CONFIGURACIÓN DEL CACHE:")
+    print(f"Django version: {django.__version__}")
+    print(f"Cache backend: {getattr(cache, '_cache', 'Unknown')}")
+    print(f"Cache class: {cache.__class__.__name__}")
+    
+    # 2. Probar escritura y lectura inmediata
+    test_key = "test_cache_debug_12345"
+    test_data = {"test": "data", "timestamp": datetime.now().isoformat()}
+    
+    print(f"\n🧪 TEST DE ESCRITURA/LECTURA:")
+    print(f"Clave de test: {test_key}")
+    
+    # Escribir
+    write_result = cache.set(test_key, test_data, 60)
+    print(f"cache.set() resultado: {write_result}")
+    
+    # Leer inmediatamente
+    read_result = cache.get(test_key)
+    print(f"cache.get() resultado: {read_result}")
+    
+    if read_result == test_data:
+        print("✅ TEST PASADO: Cache funciona correctamente")
+    else:
+        print(f"❌ TEST FALLADO: Esperado {test_data}, Obtenido {read_result}")
+    
+    # 3. Probar con APICacheService
+    print(f"\n🧪 TEST DE APICacheService:")
+    
+    # Test tipo de cambio
+    test_fecha = "2026-01-12"
+    test_tc_data = {
+        "success": True,
+        "fecha": test_fecha,
+        "compra": 3.358,
+        "venta": 3.365,
+        "test": "debug_data"
+    }
+    
+    # Guardar
+    print(f"Guardando tipo cambio para {test_fecha}...")
+    save_result = APICacheService.set_tipo_cambio(test_fecha, test_tc_data)
+    print(f"APICacheService.set_tipo_cambio() resultado: {save_result}")
+    
+    # Leer
+    print(f"Leyendo tipo cambio para {test_fecha}...")
+    read_tc = APICacheService.get_tipo_cambio(test_fecha)
+    print(f"APICacheService.get_tipo_cambio() resultado: {read_tc}")
+    
+    if read_tc:
+        print(f"✅ APICacheService funciona: Clave encontrada")
+        # Verificar la clave exacta que se usó
+        cache_key = APICacheService.get_cache_key('tipo_cambio', test_fecha)
+        print(f"   Clave usada: {cache_key}")
+        
+        # Intentar leer directamente con cache.get
+        direct_read = cache.get(cache_key)
+        print(f"   cache.get('{cache_key}'): {direct_read}")
+    else:
+        print(f"❌ APICacheService NO funciona")
+        # Intentar encontrar qué clave se usó
+        cache_key = APICacheService.get_cache_key('tipo_cambio', test_fecha)
+        print(f"   Clave que debería usarse: {cache_key}")
+        
+        # Buscar cualquier clave que contenga 'tipo_cambio' o 'tc_'
+        print(f"\n🔍 Buscando claves similares en cache...")
+        
+        # Para Redis podemos intentar keys() si está disponible
+        try:
+            # Esto solo funciona con Redis
+            all_keys = cache._cache.get_client().keys('*')
+            print(f"   Todas las claves en cache ({len(all_keys)}):")
+            for key in all_keys[:20]:  # Mostrar primeras 20
+                if isinstance(key, bytes):
+                    key = key.decode('utf-8')
+                print(f"     - {key}")
+        except:
+            print(f"   ⚠️  No se pueden listar todas las claves (backend no soportado)")
+    
+    # 4. Verificar configuración de settings.py
+    print(f"\n⚙️  CONFIGURACIÓN DE CACHE EN SETTINGS:")
+    try:
+        from django.conf import settings
+        cache_config = getattr(settings, 'CACHES', {})
+        default_cache = cache_config.get('default', {})
+        
+        print(f"   Backend: {default_cache.get('BACKEND', 'No configurado')}")
+        print(f"   Location: {default_cache.get('LOCATION', 'N/A')}")
+        print(f"   Timeout: {default_cache.get('TIMEOUT', 'N/A')}")
+        
+        # Si es Redis, mostrar más detalles
+        if 'redis' in str(default_cache.get('BACKEND', '')).lower():
+            print(f"   Redis config: {default_cache}")
+    except Exception as e:
+        print(f"   ⚠️  Error leyendo settings: {str(e)}")
+    
+    return {
+        'test_passed': read_result == test_data,
+        'apicache_passed': bool(read_tc)
+    }
+
+
 def mostrar_contenido_cache():
     """
     Muestra el contenido actual del cache para depuración
@@ -24,9 +136,6 @@ def mostrar_contenido_cache():
     print("\n" + "="*60)
     print("🔍 CONTENIDO DEL CACHE - DEBUG")
     print("="*60)
-    
-    from django.core.cache import cache
-    import json
     
     # Obtener todas las claves del cache (esto depende del backend)
     # Para Redis: cache.keys('*')
@@ -151,11 +260,13 @@ def obtener_tipo_cambio_dia(force_api=False):
                     'compra': float(tipo_cambio_db.purchase_rate),
                     'venta': float(tipo_cambio_db.sale_rate),
                     'fuente': 'database',
-                    'currency_rate_id': tipo_cambio_db.id
+                    'currency_rate_id': tipo_cambio_db.id,
+                    'cached_at': datetime.now().isoformat() 
                 }
                 
                 # Guardar en APICacheService
                 APICacheService.set_tipo_cambio(fecha_str, resultado)
+                print(f"💾 Guardado en cache desde BD")
                 return resultado
     except Exception as e:
         print(f"⚠️  Error consultando BD: {str(e)}")
@@ -206,7 +317,8 @@ def obtener_tipo_cambio_dia(force_api=False):
                     'compra': float(compra),
                     'venta': float(venta),
                     'fuente': 'api_migo_latest',
-                    'currency_rate_id': currency_rate.id
+                    'currency_rate_id': currency_rate.id,
+                    'cached_at': datetime.now().isoformat() 
                 }
                 
             except Exception as e:
@@ -223,6 +335,7 @@ def obtener_tipo_cambio_dia(force_api=False):
             
             # Guardar en APICacheService
             APICacheService.set_tipo_cambio(fecha_str, resultado)
+            print(f"💾 Guardado en cache desde BD")
             return resultado
         
     except Exception as e:
@@ -386,6 +499,39 @@ def obtener_rucs_para_validacion():
         'total': len(todos_rucs)
     }
 
+def _consolidar_resultados_mejorado(resultados, total_esperado, total_procesado_api, rucs_omitidos=None):
+    """
+    Versión corregida para evitar KeyError
+    """
+    rucs_omitidos = rucs_omitidos or []
+    
+    total_resultados = len(resultados)
+    validos = [r for r in resultados if r.get('valido_facturacion')]
+    no_validos = [r for r in resultados if not r.get('valido_facturacion')]
+    
+    # Crear estructura segura
+    consolidated = {
+        'total_esperado': total_esperado,
+        'total_procesado_api': total_procesado_api,
+        'total_validados': total_resultados,
+        'validos_facturacion': {
+            'cantidad': len(validos),
+            'porcentaje': (len(validos) / total_resultados * 100) if total_resultados > 0 else 0,
+            'items': validos[:50]
+        },
+        'no_validos_facturacion': {
+            'cantidad': len(no_validos),
+            'porcentaje': (len(no_validos) / total_resultados * 100) if total_resultados > 0 else 0,
+            'items': no_validos[:50]
+        },
+        'rucs_omitidos': {
+            'cantidad': len(rucs_omitidos),
+            'items': rucs_omitidos[:20]
+        }
+    }
+    
+    return consolidated
+
 def _consolidar_resultados(resultados, total_esperado, total_procesado_api, rucs_omitidos=None):
     """
     Consolidar resultados con manejo de RUCs omitidos
@@ -414,7 +560,7 @@ def _consolidar_resultados(resultados, total_esperado, total_procesado_api, rucs
     
     return resultados_consolidados
 
-def validar_rucs_con_cache(ruc_list, max_lotes=2, max_reintentos=2):
+def validar_rucs_con_cache(ruc_list, max_lotes=2, max_reintentos=1):
     """
     Valida RUCs con cache y reintentos resilientes para RUCs omitidos con cache en 3 niveles:
     1. Cache Django (por RUC individual y por lote)
@@ -576,102 +722,116 @@ def validar_rucs_con_cache(ruc_list, max_lotes=2, max_reintentos=2):
         print(f"\n🔄 FASE RESILIENTE: Reintentando {len(rucs_omitidos)} RUCs omitidos")
         print("="*40)
         
-        # Estrategia: intentar en lotes más pequeños o individualmente
-        estrategias = [
-            {'nombre': 'lote_5', 'tamano': 5, 'desc': 'Lotes de 5'},
-            {'nombre': 'individual', 'tamano': 1, 'desc': 'Individual'}
-        ]
+        # Estrategia: Agrupar RUCs omitidos en lotes de al menos 5
+        # Si hay menos de 5, usar consulta individual por RUC
+        print(f"\n🔄 PROCESANDO {len(rucs_omitidos)} RUCS OMITIDOS")
+        print("="*40)
         
-        for estrategia in estrategias:
-            if not rucs_omitidos:
-                break
+        # Estrategia 1: Esperar más tiempo y reintentar en un solo lote
+        print(f"  ⏳ Esperando 10 segundos para rate limit...")
+        time.sleep(10)
+        
+        try:
+            print(f"  🔧 Reintentando en lote único de {len(rucs_omitidos)} RUCs...")
+            resultado_reintento = client.consultar_ruc_masivo(rucs_omitidos)
+            api_calls += 1
+            
+            if resultado_reintento.get('success'):
+                # Procesar resultados exitosos
+                rucs_procesados_en_reintento = 0
+                for ruc_data in resultado_reintento.get('results', []):
+                    ruc = ruc_data.get('ruc')
+                    if ruc and ruc in rucs_omitidos:
+                        # Actualizar el registro...
+                        rucs_procesados_en_reintento += 1
                 
-            print(f"\n  🔧 Estrategia: {estrategia['desc']}")
+                print(f"    ✅ {rucs_procesados_en_reintento} RUCs procesados en reintento")
+                
+                # Actualizar lista de omitidos
+                rucs_recibidos = [r.get('ruc') for r in resultado_reintento.get('results', []) if r.get('ruc')]
+                rucs_omitidos = [r for r in rucs_omitidos if r not in rucs_recibidos]
+                
+            else:
+                print(f"    ⚠️  Reintento falló: {resultado_reintento.get('error', 'Error desconocido')}")
+                
+        except Exception as e:
+            print(f"    ❌ Error en reintento: {str(e)}")
+        
+        # Si aún quedan omitidos, intentar consultas individuales (uno por uno)
+        if rucs_omitidos and reintentos_realizados < max_reintentos:
+            print(f"\n  🔧 Estrategia: Consultas individuales para {len(rucs_omitidos)} RUCs")
             
-            # Particionar RUCs omitidos según estrategia
-            lotes_reintento = client._particionar_rucs_en_lotes(
-                rucs_omitidos, 
-                estrategia['tamano']
-            )
-            
-            for i, lote_reintento in enumerate(lotes_reintento):
+            for i, ruc in enumerate(rucs_omitidos):
                 if reintentos_realizados >= max_reintentos:
                     break
                     
-                print(f"    Reintento {reintentos_realizados + 1}: {len(lote_reintento)} RUCs")
+                print(f"    Reintento individual {i+1}: RUC {ruc}")
                 
                 try:
-                    time.sleep(2)  # Esperar más entre reintentos
+                    time.sleep(1)  # Pequeña pausa entre consultas
                     
-                    resultado_reintento = client.consultar_ruc_masivo(lote_reintento)
+                    # Usar consulta individual de RUC en lugar de masiva
+                    resultado_individual = client.consultar_ruc(ruc)
                     api_calls += 1
                     reintentos_realizados += 1
                     
-                    if resultado_reintento.get('success'):
-                        rucs_exitosos = []
-                        
-                        for ruc_data in resultado_reintento.get('results', []):
-                            if isinstance(ruc_data, dict):
-                                ruc = ruc_data.get('ruc')
-                                if ruc and ruc in rucs_omitidos:
-                                    # Encontrar y actualizar el registro existente
-                                    for idx, resultado in enumerate(resultados):
-                                        if resultado.get('ruc') == ruc:
-                                            # Actualizar con datos exitosos
-                                            es_valido = (
-                                                ruc_data.get('success', False) and
-                                                ruc_data.get('estado_del_contribuyente') == 'ACTIVO' and
-                                                ruc_data.get('condicion_de_domicilio') == 'HABIDO'
-                                            )
-                                            
-                                            resultados[idx] = {
-                                                'ruc': ruc,
-                                                'razon_social': ruc_data.get('nombre_o_razon_social', ''),
-                                                'estado': ruc_data.get('estado_del_contribuyente', ''),
-                                                'condicion': ruc_data.get('condicion_de_domicilio', ''),
-                                                'direccion': ruc_data.get('direccion', ''),
-                                                'actualizado_en': ruc_data.get('actualizado_en', ''),
-                                                'valido_facturacion': es_valido,
-                                                'fuente': 'api_migo_reintento',
-                                                'cacheado': False,
-                                                'lote': f"reintento_{reintentos_realizados}"
-                                            }
-                                            
-                                            rucs_exitosos.append(ruc)
-                                            rucs_procesados_api += 1
-                                            
-                                            # Guardar en cache
-                                            APICacheService.set_ruc_individual(ruc, resultados[idx])
-                                            break
-                        
-                        # Remover RUCs exitosos de la lista de omitidos
-                        rucs_omitidos = [r for r in rucs_omitidos if r not in rucs_exitosos]
-                        
-                        if rucs_exitosos:
-                            print(f"      ✅ Exitosos: {len(rucs_exitosos)} RUCs")
-                    
+                    if resultado_individual.get('success'):
+                        # Actualizar registro
+                        for idx, resultado in enumerate(resultados):
+                            if resultado.get('ruc') == ruc:
+                                es_valido = (
+                                    resultado_individual.get('estado_del_contribuyente') == 'ACTIVO' and
+                                    resultado_individual.get('condicion_de_domicilio') == 'HABIDO'
+                                )
+                                
+                                resultados[idx] = {
+                                    'ruc': ruc,
+                                    'razon_social': resultado_individual.get('nombre_o_razon_social', ''),
+                                    'estado': resultado_individual.get('estado_del_contribuyente', ''),
+                                    'condicion': resultado_individual.get('condicion_de_domicilio', ''),
+                                    'direccion': resultado_individual.get('direccion', ''),
+                                    'actualizado_en': resultado_individual.get('actualizado_en', ''),
+                                    'valido_facturacion': es_valido,
+                                    'fuente': 'api_migo_reintento_individual',
+                                    'cacheado': False,
+                                    'lote': 'reintento_individual'
+                                }
+                                
+                                # Guardar en cache
+                                APICacheService.set_ruc_individual(ruc, resultados[idx])
+                                
+                                # Remover de omitidos
+                                rucs_omitidos.remove(ruc)
+                                print(f"      ✅ RUC {ruc}: Procesado exitosamente")
+                                break
                     else:
-                        print(f"      ⚠️  Reintento falló")
-                
+                        print(f"      ⚠️  RUC {ruc}: Consulta falló")
+                        
                 except Exception as e:
-                    print(f"      ❌ Error en reintento: {str(e)}")
+                    print(f"      ❌ RUC {ruc}: Error - {str(e)}")
                     reintentos_realizados += 1
+    
+    # Si aún quedan RUCs omitidos después de todos los reintentos
+    if rucs_omitidos:
+        print(f"\n⚠️  {len(rucs_omitidos)} RUCs no pudieron ser validados vía API masiva")
+        print(f"   Estos RUCs serán marcados como 'NO_VALIDABLE'")
         
-        # Si aún quedan RUCs omitidos después de los reintentos
-        if rucs_omitidos:
-            print(f"\n⚠️  {len(rucs_omitidos)} RUCs permanecen omitidos después de {max_reintentos} reintentos")
-            for ruc in rucs_omitidos[:10]:
-                print(f"  • {ruc}")
+        for ruc in rucs_omitidos:
+            # Crear registro de "no validable" en lugar de error
+            resultados.append({
+                'ruc': ruc,
+                'razon_social': '',
+                'estado': 'NO_VALIDABLE',
+                'condicion': 'NO_VALIDABLE',
+                'valido_facturacion': False,
+                'error': 'No se pudo validar mediante API MIGO',
+                'fuente': 'api_no_validable',
+                'cacheado': False,
+                'lote': 'omitido'
+            })
     
-    print(f"\n📊 RESUMEN EJECUCIÓN:")
-    print(f"  • API calls totales: {api_calls}")
-    print(f"  • Reintentos realizados: {reintentos_realizados}")
-    print(f"  • RUCs procesados por API: {rucs_procesados_api}")
-    print(f"  • RUCs de cache: {cache_hits}")
-    print(f"  • RUCs omitidos persistentes: {len(rucs_omitidos)}")
-    
-    # 5. Consolidar resultados finales
-    resultados_consolidados = _consolidar_resultados(
+    # 5. Consolidar resultados (CORREGIDO para evitar KeyError)
+    resultados_consolidados = _consolidar_resultados_mejorado(
         resultados, 
         len(ruc_list), 
         rucs_procesados_api,
@@ -916,10 +1076,22 @@ def main():
             print("\n🔍 VALIDANDO RUCS")
             rucs_data = obtener_rucs_para_validacion()
             validacion = validar_rucs_con_cache(rucs_data['todos'], max_lotes=2)
-            print(f"\n✅ Resultado de validación:")
-            print(f"Total: {validacion['total_validados']}")
-            print(f"Válidos: {validacion['validos_facturacion']['cantidad']}")
-            print(f"No válidos: {validacion['no_validos_facturacion']['cantidad']}")
+            
+            # Mostrar resultados de forma segura
+            print(f"\n✅ RESULTADO DE VALIDACIÓN:")
+            print(f"Total esperado: {validacion.get('total_esperado', 'N/A')}")
+            print(f"Total validados: {validacion.get('total_validados', 'N/A')}")
+            
+            if 'validos_facturacion' in validacion:
+                validos = validacion['validos_facturacion']
+                print(f"Válidos para facturación: {validos.get('cantidad', 'N/A')}")
+            
+            if 'no_validos_facturacion' in validacion:
+                no_validos = validacion['no_validos_facturacion']
+                print(f"No válidos: {no_validos.get('cantidad', 'N/A')}")
+            
+            if 'rucs_omitidos' in validacion and validacion['rucs_omitidos']['cantidad'] > 0:
+                print(f"RUCs omitidos persistentes: {validacion['rucs_omitidos']['cantidad']}")
             
         elif opcion == "4":
             import glob
@@ -952,6 +1124,13 @@ def main():
             print("\n🔍 MOSTRANDO CONTENIDO DEL CACHE...")
             resultado = mostrar_contenido_cache()
             print(f"\n✅ Revisión de cache completada")
+            
+        elif opcion == "7":  # o el número que prefieras
+            print("\n🔍 DEBUG PROFUNDO DEL CACHE...")
+            resultado = debug_cache_detallado()
+            print(f"\n✅ Debug completado")
+            print(f"   Test básico: {'✅ PASÓ' if resultado['test_passed'] else '❌ FALLÓ'}")
+            print(f"   APICacheService: {'✅ PASÓ' if resultado['apicache_passed'] else '❌ FALLÓ'}")
                 
         elif opcion == "0":
             print("\n👋 Saliendo...")

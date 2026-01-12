@@ -53,11 +53,38 @@ class Partner(TimeStampedModel):
     street2 = models.CharField(max_length=255, blank=True, null=True, verbose_name="Dirección 2")
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Teléfono")
     mobile = models.CharField(max_length=20, blank=True, null=True, verbose_name="Móvil")
-    ruc_state = models.CharField(max_length=3, blank=True, null=True, verbose_name="Estado RUC")
-    ruc_condition = models.CharField(max_length=3, blank=True, null=True, verbose_name="Condición RUC")
-    sunat_success = models.BooleanField(default=False, verbose_name="SUNAT Exitosa")
-    sunat_state = models.CharField(max_length=3, blank=True, null=True, verbose_name="Estado SUNAT")
-    sunat_condition = models.CharField(max_length=3, blank=True, null=True, verbose_name="Condición SUNAT")
+    
+    # Campos SUNAT/RUC (simplificados)
+    sunat_valid = models.BooleanField(default=False, verbose_name="Válido en SUNAT")
+    sunat_state = models.CharField(
+        max_length=20, 
+        choices=[
+            ('ACTIVO', 'Activo'),
+            ('BAJA', 'Baja'),
+            ('SUSPENDIDO', 'Suspendido'),
+            ('NO_VERIFICADO', 'No Verificado')
+        ],
+        default='NO_VERIFICADO',
+        verbose_name="Estado SUNAT"
+    )
+    sunat_condition = models.CharField(
+        max_length=20,
+        choices=[
+            ('HABIDO', 'Habido'),
+            ('NO_HABIDO', 'No Habido'),
+            ('NO_APLICA', 'No Aplica'),
+            ('NO_VERIFICADO', 'No Verificado')
+        ],
+        default='NO_VERIFICADO',
+        verbose_name="Condición SUNAT"
+    )
+    sunat_last_check = models.DateTimeField(null=True, blank=True, verbose_name="Última verificación")
+    sunat_comment = models.TextField(blank=True, verbose_name="Observaciones SUNAT")
+    
+    # Campos de dirección SUNAT (para mantener datos actualizados)
+    sunat_address = models.TextField(blank=True, verbose_name="Dirección SUNAT")
+    sunat_ubigeo = models.CharField(max_length=6, blank=True, verbose_name="Ubigeo SUNAT")
+    
     partner_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True, verbose_name="Latitud")
     partner_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True, verbose_name="Longitud")    
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Empresa Relacionada", related_name="children")
@@ -80,6 +107,39 @@ class Partner(TimeStampedModel):
     
     def __str__(self): 
         return self.name
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['num_document']),
+            models.Index(fields=['sunat_valid']),
+            models.Index(fields=['sunat_state']),
+            models.Index(fields=['sunat_last_check']),
+        ]
+    
+    def update_sunat_status(self, data: dict = None, is_valid: bool = True, error: str = None):
+        """
+        Método para actualizar estado SUNAT
+        """
+        self.sunat_last_check = timezone.now()
+        
+        if not is_valid or error:
+            self.sunat_valid = False
+            self.sunat_state = 'NO_VERIFICADO'
+            self.sunat_condition = 'NO_VERIFICADO'
+            self.sunat_comment = f"[{self.sunat_last_check.date()}] ERROR: {error or 'RUC inválido'}"
+            
+        elif data:
+            self.sunat_valid = True
+            self.sunat_state = data.get('estado_del_contribuyente', 'NO_VERIFICADO')
+            self.sunat_condition = data.get('condicion_de_domicilio', 'NO_VERIFICADO')
+            
+            # Guardar dirección
+            self.sunat_address = data.get('direccion_simple', '')[:500]
+            self.sunat_ubigeo = data.get('ubigeo', '')
+            
+            self.sunat_comment = f"[{self.sunat_last_check.date()}] Validación exitosa"
+        
+        self.save()
 
 class Company(models.Model):
     partner = models.ForeignKey(Partner, on_delete=models.PROTECT, verbose_name="Partner Asociado")

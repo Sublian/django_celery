@@ -3,7 +3,7 @@ from django.core.cache import cache
 from django.utils import timezone
 import hashlib
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 class APICacheService:
     """
@@ -45,21 +45,34 @@ class APICacheService:
     @classmethod
     def get_tipo_cambio(cls, fecha=None):
         """Obtiene tipo de cambio del día desde cache"""
-        fecha_str = fecha or datetime.now().date().isoformat()
-        cache_key = cls.get_cache_key('tipo_cambio', fecha_str)
+        # Si no se pasa fecha, usa hoy
+        if fecha is None:
+            fecha = datetime.now().date().isoformat()
+        elif isinstance(fecha, date):
+            fecha = fecha.isoformat()
+        
+        # La clave debe usar el prefijo 'tc_' según tu configuración
+        cache_key = cls.get_cache_key('tipo_cambio', fecha)
         
         cached = cache.get(cache_key)
         if cached:
+            print(f"DEBUG: Cache hit para {cache_key}")
             cached['cache_hit'] = True
             cached['cache_timestamp'] = datetime.now().isoformat()
             return cached
         
+        print(f"DEBUG: Cache miss para {cache_key}")
         return None
     
     @classmethod
     def set_tipo_cambio(cls, fecha, data):
         """Guarda tipo de cambio en cache"""
-        fecha_str = fecha if isinstance(fecha, str) else fecha.isoformat()
+        # Convertir fecha a string si es date
+        if isinstance(fecha, date):
+            fecha_str = fecha.isoformat()
+        else:
+            fecha_str = str(fecha)
+        
         cache_key = cls.get_cache_key('tipo_cambio', fecha_str)
         
         # Preparar datos para cache
@@ -70,8 +83,10 @@ class APICacheService:
             'ttl_seconds': cls.TTL_CONFIG['tipo_cambio']
         }
         
-        cache.set(cache_key, cache_data, cls.TTL_CONFIG['tipo_cambio'])
-        return True
+        print(f"DEBUG: Guardando en cache: {cache_key}")
+        success = cache.set(cache_key, cache_data, cls.TTL_CONFIG['tipo_cambio'])
+        print(f"DEBUG: Guardado exitoso: {success}")
+        return success
     
     @classmethod
     def get_ruc_individual(cls, ruc):

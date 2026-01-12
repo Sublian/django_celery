@@ -30,6 +30,7 @@ class MigoAPIClient:
         self.base_url = self.service.base_url
         self.version = "1.0"  # Definir versión para User-Agent
         self.timeout = 30  # Definir timeout
+        self.rucs_invalidos_cache = set()
         
         # Mapeo de endpoints MIGO
         self.endpoints = {
@@ -222,6 +223,13 @@ class MigoAPIClient:
     
     def consultar_ruc(self, ruc):
         """Consulta datos de un RUC en SUNAT"""
+        if ruc in self.rucs_invalidos_cache:
+            return {
+                "success": False,
+                "message": "RUC marcado como inválido en cache",
+                "cache_hit": True
+            }
+            
         cache_key = f"migo_ruc_{ruc}"
         cached_data = cache.get(cache_key)
         
