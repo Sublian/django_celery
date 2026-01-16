@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
+
 import os
 from decouple import config
 from pathlib import Path
@@ -21,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-e)r_e$i#0rp$&qhttpkf1+v!&^vgzv&^d%g1t0tzz5s@93e$9_'
+SECRET_KEY = "django-insecure-e)r_e$i#0rp$&qhttpkf1+v!&^vgzv&^d%g1t0tzz5s@93e$9_"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -30,67 +31,69 @@ ALLOWED_HOSTS = []
 
 
 # Application definition
-AUTH_USER_MODEL = 'users.User'
+AUTH_USER_MODEL = "users.User"
 
 INSTALLED_APPS = [
-    'users',
-    'core',
-    'billing',
-    'api_service',
+    "users",
+    "core",
+    "billing",
+    "api_service",
     "formtools",
-    'django_extensions',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "django_extensions",
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'myproject.urls'
+ROOT_URLCONF = "myproject.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [ BASE_DIR / "templates" ],  # <-- aquí se indica la carpeta 'templates' del proyecto
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [
+            BASE_DIR / "templates"
+        ],  # <-- aquí se indica la carpeta 'templates' del proyecto
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'myproject.wsgi.application'
+WSGI_APPLICATION = "myproject.wsgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
+    "default": {
         # 'ENGINE': 'django.db.backends.sqlite3',
         # 'NAME': BASE_DIR / 'db.sqlite3',
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME'), 
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": config("DB_NAME"),
+        "USER": config("DB_USER"),
+        "PASSWORD": config("DB_PASSWORD"),
+        "HOST": config("DB_HOST", default="localhost"),
+        "PORT": config("DB_PORT", default="5432"),
     }
 }
 
@@ -100,16 +103,16 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -120,28 +123,28 @@ AUTH_PASSWORD_VALIDATORS = [
 from datetime import timedelta
 
 CELERY_BEAT_SCHEDULE = {
-    'heartbeat-every-10-seconds': {
-        'task': 'core.tasks.print_heartbeat',
-        'schedule': timedelta(seconds=10),
+    "heartbeat-every-10-seconds": {
+        "task": "core.tasks.print_heartbeat",
+        "schedule": timedelta(seconds=10),
     },
-    'send_welcome_email_5s': {
-        'task': 'core.tasks.send_welcome_email',
-        'schedule': timedelta(seconds=5),
+    "send_welcome_email_5s": {
+        "task": "core.tasks.send_welcome_email",
+        "schedule": timedelta(seconds=5),
     },
-    'reprocess_pending': {
-        'task': 'core.tasks.reprocess_pending_tasks',
-        'schedule': timedelta(minutes=5),
+    "reprocess_pending": {
+        "task": "core.tasks.reprocess_pending_tasks",
+        "schedule": timedelta(minutes=5),
     },
 }
 
-CELERY_BEAT_SCHEDULE_FILENAME = BASE_DIR / 'celery-data' / 'celerybeat-schedule'
+CELERY_BEAT_SCHEDULE_FILENAME = BASE_DIR / "celery-data" / "celerybeat-schedule"
 
 # Configuración de Celery
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
+CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
 
 # (Opcional) Zona horaria por defecto
 # CELERY_TIMEZONE = 'America/Lima'
@@ -151,8 +154,8 @@ CELERY_RESULT_SERIALIZER = 'json'
 # USE_TZ = True
 
 # 🌎 Configuración regional
-LANGUAGE_CODE = 'es-pe'
-TIME_ZONE = 'America/Lima'
+LANGUAGE_CODE = "es-pe"
+TIME_ZONE = "America/Lima"
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
@@ -161,12 +164,12 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 # 📜 Configuración de logs
@@ -174,48 +177,45 @@ LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-
+    "version": 1,
+    "disable_existing_loggers": False,
     # 🧩 Formatos de mensaje
-    'formatters': {
-        'verbose': {
-            'format': '[{asctime}] {levelname} ({name}) {message}',
-            'style': '{',
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] {levelname} ({name}) {message}",
+            "style": "{",
         },
-        'simple': {
-            'format': '{levelname}: {message}',
-            'style': '{',
+        "simple": {
+            "format": "{levelname}: {message}",
+            "style": "{",
         },
     },
-
     # 🧱 Handlers: a dónde van los logs
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
         },
-        'file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIR / 'django_app.log',
-            'maxBytes': 5 * 1024 * 1024,  # 5 MB
-            'backupCount': 3,
-            'formatter': 'verbose',
-            'encoding': 'utf-8',
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIR / "django_app.log",
+            "maxBytes": 5 * 1024 * 1024,  # 5 MB
+            "backupCount": 3,
+            "formatter": "verbose",
+            "encoding": "utf-8",
         },
     },
-
     # 🎯 Loggers: qué se registra
-    'loggers': {
-        'django': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': True,
+    "loggers": {
+        "django": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": True,
         },
-        'core': {  # tu aplicación principal
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': False,
+        "core": {  # tu aplicación principal
+            "handlers": ["console", "file"],
+            "level": "DEBUG",
+            "propagate": False,
         },
     },
 }

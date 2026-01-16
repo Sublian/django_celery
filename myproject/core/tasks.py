@@ -11,72 +11,74 @@ from .utils.celery_status import is_celery_available, is_redis_available
 
 logger = logging.getLogger(__name__)
 
+
 @shared_task
 def send_welcome_email():
-    record = TaskRecord.objects.create(task_name='send_welcome_email', status='STARTED')
+    record = TaskRecord.objects.create(task_name="send_welcome_email", status="STARTED")
     print("📧 Sending welcome email...")
-    record.status = 'SUCCESS'
+    record.status = "SUCCESS"
     record.finished_at = timezone.now()
     record.save()
     return "Welcome email sent!"
 
+
 @shared_task
 def print_heartbeat():
-    record = TaskRecord.objects.create(task_name='print_heartbeat', status='STARTED')
+    record = TaskRecord.objects.create(task_name="print_heartbeat", status="STARTED")
     print("💓 Heartbeat")
-    record.status = 'SUCCESS'
+    record.status = "SUCCESS"
     record.finished_at = timezone.now()
     record.save()
     return "Heartbeat sent!"
-    
+
+
 @shared_task(bind=True)
 def process_csv_file(self, file_id):
-    
     """Procesa CSV/XLSX, crea un TaskRecord vinculado al FileProcess y actualiza ambos modelos."""
     obj = FileProcess.objects.get(id=file_id)
-    
+
     # Crear registro de task
     record = TaskRecord.objects.create(
         fileprocess=obj,
-        task_id=(getattr(self.request, 'id', None)),
-        task_name='process_csv_file',
-        status='STARTED',
-        created_at=timezone.now()
+        task_id=(getattr(self.request, "id", None)),
+        task_name="process_csv_file",
+        status="STARTED",
+        created_at=timezone.now(),
     )
     try:
-        obj.status = 'processing'
-        obj.save(update_fields=['status'])
-        
+        obj.status = "processing"
+        obj.save(update_fields=["status"])
+
         file_path = obj.file.path
         ext = os.path.splitext(file_path)[1].lower()
         logger.info(f"📂 Iniciando procesamiento de {obj.name}")
         print(f"📂 Procesando archivo: {file_path}")
 
         # Leer el archivo dependiendo de la extensión
-        if ext == '.csv':
-            df = pd.read_csv(file_path, encoding='utf-8', on_bad_lines='skip')
-        elif ext in ('.xls', '.xlsx'):
+        if ext == ".csv":
+            df = pd.read_csv(file_path, encoding="utf-8", on_bad_lines="skip")
+        elif ext in (".xls", ".xlsx"):
             df = pd.read_excel(file_path)
         else:
             raise ValueError(f"Tipo de archivo no soportado: {ext}")
-        
+
         # Simular carga pesada
         time.sleep(2)
-        
+
         total_rows = len(df)
         print(f"✅ Procesamiento completado: {total_rows} filas")
-        
+
         # Guardar resultado en TaskRecord y FileProcess
-        record.status = 'SUCCESS'
+        record.status = "SUCCESS"
         record.result = f"Total de filas: {total_rows}"
         record.finished_at = timezone.now()
-        record.save(update_fields=['status', 'result', 'finished_at'])
-        
+        record.save(update_fields=["status", "result", "finished_at"])
+
         # Actualizar el estado y marcar como procesado
-        obj.status = 'done'
+        obj.status = "done"
         obj.processed = True
-        obj.message = f'Procesamiento completado: {total_rows} filas'
-        obj.save(update_fields=['status', 'processed', 'message'])
+        obj.message = f"Procesamiento completado: {total_rows} filas"
+        obj.save(update_fields=["status", "processed", "message"])
         logger.info(f"✅ Archivo {obj.name} procesado correctamente.")
 
         # Puedes agregar lógica de procesamiento aquí (por ejemplo guardar resultados)
@@ -86,38 +88,42 @@ def process_csv_file(self, file_id):
         # Guardar error en TaskRecord y FileProcess
         print(f"❌ Error procesando archivo: {e}")
         logger.error(f"❌ Error procesando archivo {file_id}: {e}", exc_info=True)
-        record.status = 'FAILURE'
+        record.status = "FAILURE"
         record.result = str(e)
         record.finished_at = timezone.now()
-        record.save(update_fields=['status', 'result', 'finished_at'])
-        
-        obj.status = 'error'
+        record.save(update_fields=["status", "result", "finished_at"])
+
+        obj.status = "error"
         obj.message = str(e)
-        obj.save(update_fields=['status', 'message'])
-        raise 
+        obj.save(update_fields=["status", "message"])
+        raise
+
 
 # 📦 Reutilizamos el despachador central de tareas
 TASK_DISPATCHER = {
-    'core.tasks.process_csv_file': lambda args: process_csv_file.delay(**args),
+    "core.tasks.process_csv_file": lambda args: process_csv_file.delay(**args),
     # Ejemplo para futuras tareas:
     # 'core.tasks.generar_reporte': lambda args: generar_reporte.delay(args.get('reporte_id')),
 }
-    
+
+
 @shared_task
 def reprocess_pending_tasks():
     """
     Reprocesa automáticamente las tareas pendientes guardadas cuando Celery o Redis estaban inactivos.
     Se ejecuta cada 5 minutos.
     """
-    redis_ok =is_redis_available()
+    redis_ok = is_redis_available()
     # celery_ok = is_celery_available()
     celery_ok = redis_ok
-    logger.info(f"🔁 [AutoReprocess] Redis: {redis_ok}, Celery: {celery_ok} (modo interno Celery)")
+    logger.info(
+        f"🔁 [AutoReprocess] Redis: {redis_ok}, Celery: {celery_ok} (modo interno Celery)"
+    )
     if not (celery_ok and redis_ok):
         logger.warning(f"⚠️ Celery o Redis aún no disponibles. Reintentará más tarde.")
         return "Celery/Redis no disponibles"
 
-    pending = PendingTask.objects.all().order_by('-created_at')
+    pending = PendingTask.objects.all().order_by("-created_at")
     total = pending.count()
 
     if total == 0:
@@ -144,12 +150,12 @@ def reprocess_pending_tasks():
                 logger.info(f"✅ Reprocesada tarea {task.id}: {task_name} ({args})")
             else:
                 no_reconocidas += 1
-                logger.warning(f"⚠️ Tarea '{task_name}' no está registrada en el despachador.")
+                logger.warning(
+                    f"⚠️ Tarea '{task_name}' no está registrada en el despachador."
+                )
         except Exception as e:
             logger.error(f"❌ Error reprocesando tarea {task.id}: {e}", exc_info=True)
 
     logger.info(f"🔁 Reprocesadas: {reprocesadas}, No reconocidas: {no_reconocidas}")
 
     return f"{reprocesadas} tareas reprocesadas, {no_reconocidas} no reconocidas."
-
-    

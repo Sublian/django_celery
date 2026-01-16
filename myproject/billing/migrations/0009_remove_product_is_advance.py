@@ -6,12 +6,12 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('billing', '0008_salesubscription_invoices_generated_and_more'),
+        ("billing", "0008_salesubscription_invoices_generated_and_more"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='product',
-            name='is_advance',
+            model_name="product",
+            name="is_advance",
         ),
     ]

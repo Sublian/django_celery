@@ -6,13 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('billing', '0018_contracttemplate_payment_term_partner_payment_term_and_more'),
+        ("billing", "0018_contracttemplate_payment_term_partner_payment_term_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='partner',
-            name='invoice_end_of_month_payment',
-            field=models.BooleanField(default=False, help_text='Las facturas de este cliente tienen vencimiento a fin de mes (30/28 días)', verbose_name='Pago Factura Fin de Mes'),
+            model_name="partner",
+            name="invoice_end_of_month_payment",
+            field=models.BooleanField(
+                default=False,
+                help_text="Las facturas de este cliente tienen vencimiento a fin de mes (30/28 días)",
+                verbose_name="Pago Factura Fin de Mes",
+            ),
         ),
     ]

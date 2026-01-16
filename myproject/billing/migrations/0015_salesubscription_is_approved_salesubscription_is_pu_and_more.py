@@ -7,38 +7,51 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('billing', '0014_salesubscription_is_active'),
+        ("billing", "0014_salesubscription_is_active"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='salesubscription',
-            name='is_approved',
-            field=models.BooleanField(default=False, help_text='Indica si la suscripción ha sido aprobada'),
+            model_name="salesubscription",
+            name="is_approved",
+            field=models.BooleanField(
+                default=False, help_text="Indica si la suscripción ha sido aprobada"
+            ),
         ),
         migrations.AddField(
-            model_name='salesubscription',
-            name='is_pu',
-            field=models.BooleanField(default=False, help_text='Indica si la suscripción es de tipo PU'),
+            model_name="salesubscription",
+            name="is_pu",
+            field=models.BooleanField(
+                default=False, help_text="Indica si la suscripción es de tipo PU"
+            ),
         ),
         migrations.AddField(
-            model_name='salesubscription',
-            name='is_recurring',
-            field=models.BooleanField(default=True, help_text='Indica si la suscripción es recurrente'),
+            model_name="salesubscription",
+            name="is_recurring",
+            field=models.BooleanField(
+                default=True, help_text="Indica si la suscripción es recurrente"
+            ),
         ),
         migrations.AlterField(
-            model_name='accountmove',
-            name='invoice_date',
-            field=models.DateField(default=django.utils.timezone.now, help_text='Fecha de Emisión de la Factura'),
+            model_name="accountmove",
+            name="invoice_date",
+            field=models.DateField(
+                default=django.utils.timezone.now,
+                help_text="Fecha de Emisión de la Factura",
+            ),
         ),
         migrations.AlterField(
-            model_name='accountmove',
-            name='invoice_date_due',
-            field=models.DateField(blank=True, help_text='Fecha de Vencimiento de la Factura', null=True),
+            model_name="accountmove",
+            name="invoice_date_due",
+            field=models.DateField(
+                blank=True, help_text="Fecha de Vencimiento de la Factura", null=True
+            ),
         ),
         migrations.AlterField(
-            model_name='accountmove',
-            name='narration',
-            field=models.TextField(blank=True, help_text='Notas o Comentarios de la Factura', null=True),
+            model_name="accountmove",
+            name="narration",
+            field=models.TextField(
+                blank=True, help_text="Notas o Comentarios de la Factura", null=True
+            ),
         ),
     ]

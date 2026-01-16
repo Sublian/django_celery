@@ -1,10 +1,12 @@
 from django.shortcuts import redirect
 
+
 class WizardSessionRequiredMixin:
     """
     Bloquea el acceso a un paso del wizard cuando la sesión del paso previo no existe.
     Cada vista define cuál clave de sesión requiere.
     """
+
     required_key = None
 
     def dispatch(self, request, *args, **kwargs):

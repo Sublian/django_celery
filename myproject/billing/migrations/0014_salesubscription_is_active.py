@@ -6,13 +6,15 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('billing', '0013_alter_salesubscription_code_and_more'),
+        ("billing", "0013_alter_salesubscription_code_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='salesubscription',
-            name='is_active',
-            field=models.BooleanField(default=True, help_text='Indica si la suscripción está activa'),
+            model_name="salesubscription",
+            name="is_active",
+            field=models.BooleanField(
+                default=True, help_text="Indica si la suscripción está activa"
+            ),
         ),
     ]

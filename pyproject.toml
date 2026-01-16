@@ -20,5 +20,6 @@ dependencies = [
     "requests>=2.27",
     "openpyxl>=3.0",
     "numpy>=2.4.0",
+    "black>=25.12.0",
 ]
 

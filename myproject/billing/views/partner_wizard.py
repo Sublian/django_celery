@@ -8,13 +8,13 @@ from billing.views.mixins import WizardSessionRequiredMixin
 from billing.forms.partner_steps import (
     PartnerStep1Form,
     PartnerStep2Form,
-    PartnerStep3Form
+    PartnerStep3Form,
 )
 from billing.models import Partner
 from users.models import User
 
 
-#   PASO 1  
+#   PASO 1
 class PartnerWizardStep1(FormView):
     template_name = "billing/partner/wizard/step1.html"
     form_class = PartnerStep1Form
@@ -25,7 +25,7 @@ class PartnerWizardStep1(FormView):
         # Convertir parent a ID
         if data.get("parent"):
             data["parent"] = data["parent"].id
-            
+
         self.request.session["partner_step1"] = data
 
         # 👇 Condición: si NO es cliente, saltarse el paso 2
@@ -34,7 +34,8 @@ class PartnerWizardStep1(FormView):
 
         return redirect("billing:partner_wizard_step2")
 
-#   PASO 2  
+
+#   PASO 2
 class PartnerWizardStep2(WizardSessionRequiredMixin, FormView):
     template_name = "billing/partner/wizard/step2.html"
     form_class = PartnerStep2Form
@@ -46,7 +47,7 @@ class PartnerWizardStep2(WizardSessionRequiredMixin, FormView):
         return redirect("billing:partner_wizard_step3")
 
 
-#   PASO 3  
+#   PASO 3
 class PartnerWizardStep3(WizardSessionRequiredMixin, FormView):
     template_name = "billing/partner/wizard/step3.html"
     form_class = PartnerStep3Form
@@ -63,7 +64,7 @@ class PartnerWizardStep3(WizardSessionRequiredMixin, FormView):
         return redirect("billing:partner_wizard_finish")
 
 
-#   FINALIZACIÓN DEL WIZARD  
+#   FINALIZACIÓN DEL WIZARD
 class PartnerWizardFinish(WizardSessionRequiredMixin, TemplateView):
     template_name = "billing/partner/wizard/finish.html"
     required_key = "partner_step1"

@@ -7,14 +7,20 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('billing', '0002_remove_partner_user_partner_companies'),
-        ('users', '0001_initial'),
+        ("billing", "0002_remove_partner_user_partner_companies"),
+        ("users", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='user',
-            name='partner',
-            field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='user_account', to='billing.partner'),
+            model_name="user",
+            name="partner",
+            field=models.OneToOneField(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="user_account",
+                to="billing.partner",
+            ),
         ),
     ]

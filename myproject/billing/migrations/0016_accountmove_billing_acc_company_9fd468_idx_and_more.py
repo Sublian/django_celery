@@ -6,16 +6,25 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('billing', '0015_salesubscription_is_approved_salesubscription_is_pu_and_more'),
+        (
+            "billing",
+            "0015_salesubscription_is_approved_salesubscription_is_pu_and_more",
+        ),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='accountmove',
-            index=models.Index(fields=['company', 'invoice_number'], name='billing_acc_company_9fd468_idx'),
+            model_name="accountmove",
+            index=models.Index(
+                fields=["company", "invoice_number"],
+                name="billing_acc_company_9fd468_idx",
+            ),
         ),
         migrations.AddIndex(
-            model_name='accountmove',
-            index=models.Index(fields=['serie', 'invoice_number'], name='billing_acc_serie_i_5f8a7e_idx'),
+            model_name="accountmove",
+            index=models.Index(
+                fields=["serie", "invoice_number"],
+                name="billing_acc_serie_i_5f8a7e_idx",
+            ),
         ),
     ]

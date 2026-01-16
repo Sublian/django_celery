@@ -7,8 +7,8 @@ from billing.forms.company import CompanyForm
 
 
 def company_list(request):
-    companies = Company.objects.all().order_by('id')
-    return render(request, 'billing/company/list.html', {"companies": companies})
+    companies = Company.objects.all().order_by("id")
+    return render(request, "billing/company/list.html", {"companies": companies})
 
 
 def company_create(request):
@@ -30,17 +30,21 @@ def company_edit(request, pk):
         messages.success(request, "Compañía actualizada correctamente.")
         return redirect("billing:company_detail", pk=pk)
 
-    return render(request, "billing/company/edit.html", {"form": form, "company": company})
+    return render(
+        request, "billing/company/edit.html", {"form": form, "company": company}
+    )
 
 
 def company_detail(request, pk):
     company = get_object_or_404(Company, pk=pk)
-    return render(request, 'billing/company/detail.html', {"company": company})
+    return render(request, "billing/company/detail.html", {"company": company})
 
 
 def company_toggle_active(request, pk):
     company = get_object_or_404(Company, pk=pk)
     company.active = not company.active
     company.save()
-    messages.info(request, f"Estado cambiado: {'Activa' if company.active else 'Inactiva'}")
-    return redirect('billing:company_list')
+    messages.info(
+        request, f"Estado cambiado: {'Activa' if company.active else 'Inactiva'}"
+    )
+    return redirect("billing:company_list")

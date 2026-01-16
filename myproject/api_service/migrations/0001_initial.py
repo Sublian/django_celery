@@ -17,120 +17,506 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='ApiService',
+            name="ApiService",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(help_text="Nombre identificador del servicio API (ej: 'APIMIGO Perú')", max_length=100, unique=True)),
-                ('service_type', models.CharField(help_text="Tipo de servicio (ej: 'MIGO', 'NUBEFACT', 'SUNAT', 'OTRO')", max_length=50)),
-                ('base_url', models.URLField(help_text='URL base del servicio API (ej: https://api.migo.pe)')),
-                ('auth_token', models.CharField(blank=True, help_text='Token, API Key o credenciales para autenticación', max_length=512)),
-                ('auth_type', models.CharField(choices=[('token', 'Token Simple'), ('bearer', 'Bearer Token (JWT)'), ('api_key', 'API Key'), ('basic', 'Basic Auth')], default='token', help_text='Tipo de autenticación requerida por el servicio', max_length=20)),
-                ('is_active', models.BooleanField(default=True, help_text='Indica si el servicio está activo y disponible para uso')),
-                ('requests_per_minute', models.IntegerField(default=60, help_text='Límite máximo de peticiones por minuto (rate limiting)', validators=[django.core.validators.MinValueValidator(1), django.core.validators.MaxValueValidator(1000)])),
-                ('max_batch_size', models.IntegerField(default=100, help_text='Tamaño máximo para solicitudes masivas (batch)', validators=[django.core.validators.MinValueValidator(1), django.core.validators.MaxValueValidator(1000)])),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        help_text="Nombre identificador del servicio API (ej: 'APIMIGO Perú')",
+                        max_length=100,
+                        unique=True,
+                    ),
+                ),
+                (
+                    "service_type",
+                    models.CharField(
+                        help_text="Tipo de servicio (ej: 'MIGO', 'NUBEFACT', 'SUNAT', 'OTRO')",
+                        max_length=50,
+                    ),
+                ),
+                (
+                    "base_url",
+                    models.URLField(
+                        help_text="URL base del servicio API (ej: https://api.migo.pe)"
+                    ),
+                ),
+                (
+                    "auth_token",
+                    models.CharField(
+                        blank=True,
+                        help_text="Token, API Key o credenciales para autenticación",
+                        max_length=512,
+                    ),
+                ),
+                (
+                    "auth_type",
+                    models.CharField(
+                        choices=[
+                            ("token", "Token Simple"),
+                            ("bearer", "Bearer Token (JWT)"),
+                            ("api_key", "API Key"),
+                            ("basic", "Basic Auth"),
+                        ],
+                        default="token",
+                        help_text="Tipo de autenticación requerida por el servicio",
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        default=True,
+                        help_text="Indica si el servicio está activo y disponible para uso",
+                    ),
+                ),
+                (
+                    "requests_per_minute",
+                    models.IntegerField(
+                        default=60,
+                        help_text="Límite máximo de peticiones por minuto (rate limiting)",
+                        validators=[
+                            django.core.validators.MinValueValidator(1),
+                            django.core.validators.MaxValueValidator(1000),
+                        ],
+                    ),
+                ),
+                (
+                    "max_batch_size",
+                    models.IntegerField(
+                        default=100,
+                        help_text="Tamaño máximo para solicitudes masivas (batch)",
+                        validators=[
+                            django.core.validators.MinValueValidator(1),
+                            django.core.validators.MaxValueValidator(1000),
+                        ],
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
             ],
             options={
-                'verbose_name': 'Servicio API',
-                'verbose_name_plural': 'Servicios API',
-                'ordering': ['name'],
-                'indexes': [models.Index(fields=['service_type', 'is_active'], name='api_service_service_839eba_idx'), models.Index(fields=['is_active'], name='api_service_is_acti_1f6602_idx')],
+                "verbose_name": "Servicio API",
+                "verbose_name_plural": "Servicios API",
+                "ordering": ["name"],
+                "indexes": [
+                    models.Index(
+                        fields=["service_type", "is_active"],
+                        name="api_service_service_839eba_idx",
+                    ),
+                    models.Index(
+                        fields=["is_active"], name="api_service_is_acti_1f6602_idx"
+                    ),
+                ],
             },
         ),
         migrations.CreateModel(
-            name='ApiRateLimit',
+            name="ApiRateLimit",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('current_count', models.IntegerField(default=0, help_text='Número de peticiones en la ventana actual')),
-                ('last_request_at', models.DateTimeField(auto_now=True, help_text='Última vez que se hizo una petición')),
-                ('minute_window_start', models.DateTimeField(auto_now=True, help_text='Inicio de la ventana de 1 minuto para rate limiting')),
-                ('total_requests', models.IntegerField(default=0, help_text='Total de peticiones realizadas (histórico)')),
-                ('service', models.OneToOneField(help_text='Servicio API monitoreado', on_delete=django.db.models.deletion.CASCADE, related_name='rate_limit_status', to='api_service.apiservice')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "current_count",
+                    models.IntegerField(
+                        default=0, help_text="Número de peticiones en la ventana actual"
+                    ),
+                ),
+                (
+                    "last_request_at",
+                    models.DateTimeField(
+                        auto_now=True, help_text="Última vez que se hizo una petición"
+                    ),
+                ),
+                (
+                    "minute_window_start",
+                    models.DateTimeField(
+                        auto_now=True,
+                        help_text="Inicio de la ventana de 1 minuto para rate limiting",
+                    ),
+                ),
+                (
+                    "total_requests",
+                    models.IntegerField(
+                        default=0,
+                        help_text="Total de peticiones realizadas (histórico)",
+                    ),
+                ),
+                (
+                    "service",
+                    models.OneToOneField(
+                        help_text="Servicio API monitoreado",
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="rate_limit_status",
+                        to="api_service.apiservice",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Control de Rate Limit',
-                'verbose_name_plural': 'Controles de Rate Limit',
+                "verbose_name": "Control de Rate Limit",
+                "verbose_name_plural": "Controles de Rate Limit",
             },
         ),
         migrations.CreateModel(
-            name='ApiEndpoint',
+            name="ApiEndpoint",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(help_text="Nombre descriptivo del endpoint (ej: 'Consulta RUC')", max_length=100)),
-                ('path', models.CharField(help_text="Ruta del endpoint (ej: '/api/v1/ruc')", max_length=200)),
-                ('method', models.CharField(choices=[('GET', 'GET'), ('POST', 'POST'), ('PUT', 'PUT'), ('DELETE', 'DELETE'), ('PATCH', 'PATCH')], default='POST', help_text='Método HTTP utilizado', max_length=10)),
-                ('description', models.TextField(blank=True, help_text='Descripción detallada del endpoint y su uso')),
-                ('is_active', models.BooleanField(default=True, help_text='Indica si el endpoint está activo')),
-                ('custom_rate_limit', models.IntegerField(blank=True, help_text='Límite personalizado para este endpoint (sobrescribe el del servicio)', null=True, validators=[django.core.validators.MinValueValidator(1)])),
-                ('service', models.ForeignKey(help_text='Servicio API al que pertenece este endpoint', on_delete=django.db.models.deletion.CASCADE, related_name='endpoints', to='api_service.apiservice')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        help_text="Nombre descriptivo del endpoint (ej: 'Consulta RUC')",
+                        max_length=100,
+                    ),
+                ),
+                (
+                    "path",
+                    models.CharField(
+                        help_text="Ruta del endpoint (ej: '/api/v1/ruc')",
+                        max_length=200,
+                    ),
+                ),
+                (
+                    "method",
+                    models.CharField(
+                        choices=[
+                            ("GET", "GET"),
+                            ("POST", "POST"),
+                            ("PUT", "PUT"),
+                            ("DELETE", "DELETE"),
+                            ("PATCH", "PATCH"),
+                        ],
+                        default="POST",
+                        help_text="Método HTTP utilizado",
+                        max_length=10,
+                    ),
+                ),
+                (
+                    "description",
+                    models.TextField(
+                        blank=True,
+                        help_text="Descripción detallada del endpoint y su uso",
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        default=True, help_text="Indica si el endpoint está activo"
+                    ),
+                ),
+                (
+                    "custom_rate_limit",
+                    models.IntegerField(
+                        blank=True,
+                        help_text="Límite personalizado para este endpoint (sobrescribe el del servicio)",
+                        null=True,
+                        validators=[django.core.validators.MinValueValidator(1)],
+                    ),
+                ),
+                (
+                    "service",
+                    models.ForeignKey(
+                        help_text="Servicio API al que pertenece este endpoint",
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="endpoints",
+                        to="api_service.apiservice",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Endpoint API',
-                'verbose_name_plural': 'Endpoints API',
-                'ordering': ['service', 'path'],
-                'unique_together': {('service', 'path', 'method')},
+                "verbose_name": "Endpoint API",
+                "verbose_name_plural": "Endpoints API",
+                "ordering": ["service", "path"],
+                "unique_together": {("service", "path", "method")},
             },
         ),
         migrations.CreateModel(
-            name='ApiBatchRequest',
+            name="ApiBatchRequest",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, help_text='Identificador único de la solicitud masiva', primary_key=True, serialize=False)),
-                ('status', models.CharField(choices=[('PENDING', '⏳ Pendiente'), ('PROCESSING', '🔄 Procesando'), ('PARTIAL', '⚠️ Parcialmente Completado'), ('COMPLETED', '✅ Completado'), ('FAILED', '❌ Fallido'), ('CANCELLED', '🚫 Cancelado')], default='PENDING', help_text='Estado actual del procesamiento masivo', max_length=20)),
-                ('priority', models.CharField(choices=[('LOW', '🔵 Baja'), ('NORMAL', '🟢 Normal'), ('HIGH', '🟡 Alta'), ('CRITICAL', '🔴 Crítica')], default='NORMAL', help_text='Prioridad de procesamiento', max_length=10)),
-                ('input_data', models.JSONField(help_text='Datos de entrada para el procesamiento masivo')),
-                ('results', models.JSONField(blank=True, help_text='Resultados consolidados del procesamiento', null=True)),
-                ('total_items', models.IntegerField(default=0, help_text='Número total de items a procesar')),
-                ('processed_items', models.IntegerField(default=0, help_text='Items procesados hasta el momento')),
-                ('successful_items', models.IntegerField(default=0, help_text='Items procesados exitosamente')),
-                ('failed_items', models.IntegerField(default=0, help_text='Items que fallaron en el procesamiento')),
-                ('error_summary', models.JSONField(blank=True, help_text='Resumen de errores agrupados por tipo', null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('started_at', models.DateTimeField(blank=True, null=True)),
-                ('completed_at', models.DateTimeField(blank=True, null=True)),
-                ('requested_by', models.ForeignKey(blank=True, help_text='Usuario que solicitó el procesamiento', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='api_batch_requests', to=settings.AUTH_USER_MODEL)),
-                ('service', models.ForeignKey(help_text='Servicio API utilizado para esta solicitud masiva', on_delete=django.db.models.deletion.PROTECT, related_name='batch_requests', to='api_service.apiservice')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        help_text="Identificador único de la solicitud masiva",
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("PENDING", "⏳ Pendiente"),
+                            ("PROCESSING", "🔄 Procesando"),
+                            ("PARTIAL", "⚠️ Parcialmente Completado"),
+                            ("COMPLETED", "✅ Completado"),
+                            ("FAILED", "❌ Fallido"),
+                            ("CANCELLED", "🚫 Cancelado"),
+                        ],
+                        default="PENDING",
+                        help_text="Estado actual del procesamiento masivo",
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "priority",
+                    models.CharField(
+                        choices=[
+                            ("LOW", "🔵 Baja"),
+                            ("NORMAL", "🟢 Normal"),
+                            ("HIGH", "🟡 Alta"),
+                            ("CRITICAL", "🔴 Crítica"),
+                        ],
+                        default="NORMAL",
+                        help_text="Prioridad de procesamiento",
+                        max_length=10,
+                    ),
+                ),
+                (
+                    "input_data",
+                    models.JSONField(
+                        help_text="Datos de entrada para el procesamiento masivo"
+                    ),
+                ),
+                (
+                    "results",
+                    models.JSONField(
+                        blank=True,
+                        help_text="Resultados consolidados del procesamiento",
+                        null=True,
+                    ),
+                ),
+                (
+                    "total_items",
+                    models.IntegerField(
+                        default=0, help_text="Número total de items a procesar"
+                    ),
+                ),
+                (
+                    "processed_items",
+                    models.IntegerField(
+                        default=0, help_text="Items procesados hasta el momento"
+                    ),
+                ),
+                (
+                    "successful_items",
+                    models.IntegerField(
+                        default=0, help_text="Items procesados exitosamente"
+                    ),
+                ),
+                (
+                    "failed_items",
+                    models.IntegerField(
+                        default=0, help_text="Items que fallaron en el procesamiento"
+                    ),
+                ),
+                (
+                    "error_summary",
+                    models.JSONField(
+                        blank=True,
+                        help_text="Resumen de errores agrupados por tipo",
+                        null=True,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("started_at", models.DateTimeField(blank=True, null=True)),
+                ("completed_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "requested_by",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="Usuario que solicitó el procesamiento",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="api_batch_requests",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "service",
+                    models.ForeignKey(
+                        help_text="Servicio API utilizado para esta solicitud masiva",
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="batch_requests",
+                        to="api_service.apiservice",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Solicitud Masiva API',
-                'verbose_name_plural': 'Solicitudes Masivas API',
-                'ordering': ['-created_at'],
+                "verbose_name": "Solicitud Masiva API",
+                "verbose_name_plural": "Solicitudes Masivas API",
+                "ordering": ["-created_at"],
             },
         ),
         migrations.CreateModel(
-            name='ApiCallLog',
+            name="ApiCallLog",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, help_text='Identificador único de la llamada', primary_key=True, serialize=False)),
-                ('status', models.CharField(choices=[('PENDING', '🟡 Pendiente'), ('SUCCESS', '🟢 Éxito'), ('FAILED', '🔴 Fallido'), ('RATE_LIMITED', '⏸️ Limitado por tasa'), ('RETRYING', '🔄 Reintentando')], default='PENDING', help_text='Estado actual de la llamada', max_length=20)),
-                ('request_data', models.JSONField(default=dict, help_text='Datos enviados en la petición (formato JSON)')),
-                ('response_data', models.JSONField(blank=True, help_text='Respuesta completa de la API (formato JSON)', null=True)),
-                ('response_code', models.IntegerField(blank=True, help_text='Código HTTP de la respuesta (200, 404, 500, etc.)', null=True)),
-                ('error_message', models.TextField(blank=True, help_text='Mensaje de error en caso de fallo')),
-                ('duration_ms', models.IntegerField(blank=True, help_text='Duración de la llamada en milisegundos', null=True)),
-                ('called_from', models.CharField(blank=True, help_text='Módulo/función que realizó la llamada (para trazabilidad)', max_length=500)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('batch_request', models.ForeignKey(blank=True, help_text='Solicitud masiva a la que pertenece esta llamada', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='call_logs', to='api_service.apibatchrequest')),
-                ('endpoint', models.ForeignKey(blank=True, help_text='Endpoint específico utilizado', null=True, on_delete=django.db.models.deletion.PROTECT, related_name='call_logs', to='api_service.apiendpoint')),
-                ('service', models.ForeignKey(help_text='Servicio API llamado', on_delete=django.db.models.deletion.PROTECT, related_name='call_logs', to='api_service.apiservice')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        help_text="Identificador único de la llamada",
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("PENDING", "🟡 Pendiente"),
+                            ("SUCCESS", "🟢 Éxito"),
+                            ("FAILED", "🔴 Fallido"),
+                            ("RATE_LIMITED", "⏸️ Limitado por tasa"),
+                            ("RETRYING", "🔄 Reintentando"),
+                        ],
+                        default="PENDING",
+                        help_text="Estado actual de la llamada",
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "request_data",
+                    models.JSONField(
+                        default=dict,
+                        help_text="Datos enviados en la petición (formato JSON)",
+                    ),
+                ),
+                (
+                    "response_data",
+                    models.JSONField(
+                        blank=True,
+                        help_text="Respuesta completa de la API (formato JSON)",
+                        null=True,
+                    ),
+                ),
+                (
+                    "response_code",
+                    models.IntegerField(
+                        blank=True,
+                        help_text="Código HTTP de la respuesta (200, 404, 500, etc.)",
+                        null=True,
+                    ),
+                ),
+                (
+                    "error_message",
+                    models.TextField(
+                        blank=True, help_text="Mensaje de error en caso de fallo"
+                    ),
+                ),
+                (
+                    "duration_ms",
+                    models.IntegerField(
+                        blank=True,
+                        help_text="Duración de la llamada en milisegundos",
+                        null=True,
+                    ),
+                ),
+                (
+                    "called_from",
+                    models.CharField(
+                        blank=True,
+                        help_text="Módulo/función que realizó la llamada (para trazabilidad)",
+                        max_length=500,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "batch_request",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="Solicitud masiva a la que pertenece esta llamada",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="call_logs",
+                        to="api_service.apibatchrequest",
+                    ),
+                ),
+                (
+                    "endpoint",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="Endpoint específico utilizado",
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="call_logs",
+                        to="api_service.apiendpoint",
+                    ),
+                ),
+                (
+                    "service",
+                    models.ForeignKey(
+                        help_text="Servicio API llamado",
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="call_logs",
+                        to="api_service.apiservice",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Registro de Llamada API',
-                'verbose_name_plural': 'Registros de Llamadas API',
-                'ordering': ['-created_at'],
-                'indexes': [models.Index(fields=['service', 'status', 'created_at'], name='api_service_service_9041a2_idx'), models.Index(fields=['created_at'], name='api_service_created_ff2f87_idx'), models.Index(fields=['status', 'response_code'], name='api_service_status_818cf0_idx'), models.Index(fields=['called_from'], name='api_service_called__f7b440_idx')],
+                "verbose_name": "Registro de Llamada API",
+                "verbose_name_plural": "Registros de Llamadas API",
+                "ordering": ["-created_at"],
+                "indexes": [
+                    models.Index(
+                        fields=["service", "status", "created_at"],
+                        name="api_service_service_9041a2_idx",
+                    ),
+                    models.Index(
+                        fields=["created_at"], name="api_service_created_ff2f87_idx"
+                    ),
+                    models.Index(
+                        fields=["status", "response_code"],
+                        name="api_service_status_818cf0_idx",
+                    ),
+                    models.Index(
+                        fields=["called_from"], name="api_service_called__f7b440_idx"
+                    ),
+                ],
             },
         ),
         migrations.AddIndex(
-            model_name='apibatchrequest',
-            index=models.Index(fields=['service', 'status', 'priority'], name='api_service_service_d5474a_idx'),
+            model_name="apibatchrequest",
+            index=models.Index(
+                fields=["service", "status", "priority"],
+                name="api_service_service_d5474a_idx",
+            ),
         ),
         migrations.AddIndex(
-            model_name='apibatchrequest',
-            index=models.Index(fields=['status', 'created_at'], name='api_service_status_7b3c54_idx'),
+            model_name="apibatchrequest",
+            index=models.Index(
+                fields=["status", "created_at"], name="api_service_status_7b3c54_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='apibatchrequest',
-            index=models.Index(fields=['requested_by', 'created_at'], name='api_service_request_36ff70_idx'),
+            model_name="apibatchrequest",
+            index=models.Index(
+                fields=["requested_by", "created_at"],
+                name="api_service_request_36ff70_idx",
+            ),
         ),
     ]

@@ -27,6 +27,7 @@ def is_redis_available():
         logger.warning(f"⚠️ Redis no disponible: {e}")
         return False
 
+
 def is_celery_available():
     try:
         app = current_app

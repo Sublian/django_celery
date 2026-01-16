@@ -9,47 +9,103 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='FileProcess',
+            name="FileProcess",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255)),
-                ('file', models.FileField(upload_to='uploads/')),
-                ('status', models.CharField(choices=[('pending', 'Pendiente'), ('processing', 'Procesando'), ('done', 'Completado'), ('error', 'Error')], default='pending', max_length=20)),
-                ('message', models.TextField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('processed', models.BooleanField(default=False)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("file", models.FileField(upload_to="uploads/")),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("pending", "Pendiente"),
+                            ("processing", "Procesando"),
+                            ("done", "Completado"),
+                            ("error", "Error"),
+                        ],
+                        default="pending",
+                        max_length=20,
+                    ),
+                ),
+                ("message", models.TextField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("processed", models.BooleanField(default=False)),
             ],
         ),
         migrations.CreateModel(
-            name='PendingTask',
+            name="PendingTask",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('task_name', models.CharField(max_length=255)),
-                ('args', models.JSONField(default=dict)),
-                ('created_at', models.DateTimeField(default=django.utils.timezone.now)),
-                ('processed', models.BooleanField(default=False)),
-                ('processed_at', models.DateTimeField(blank=True, null=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("task_name", models.CharField(max_length=255)),
+                ("args", models.JSONField(default=dict)),
+                ("created_at", models.DateTimeField(default=django.utils.timezone.now)),
+                ("processed", models.BooleanField(default=False)),
+                ("processed_at", models.DateTimeField(blank=True, null=True)),
             ],
         ),
         migrations.CreateModel(
-            name='TaskRecord',
+            name="TaskRecord",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('task_id', models.CharField(blank=True, max_length=255, null=True)),
-                ('task_name', models.CharField(max_length=100)),
-                ('status', models.CharField(choices=[('PENDING', 'Pending'), ('STARTED', 'Started'), ('SUCCESS', 'Success'), ('FAILURE', 'Failure')], default='PENDING', max_length=20)),
-                ('result', models.TextField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('finished_at', models.DateTimeField(blank=True, null=True)),
-                ('fileprocess', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='task_records', to='core.fileprocess')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("task_id", models.CharField(blank=True, max_length=255, null=True)),
+                ("task_name", models.CharField(max_length=100)),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("PENDING", "Pending"),
+                            ("STARTED", "Started"),
+                            ("SUCCESS", "Success"),
+                            ("FAILURE", "Failure"),
+                        ],
+                        default="PENDING",
+                        max_length=20,
+                    ),
+                ),
+                ("result", models.TextField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("finished_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "fileprocess",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="task_records",
+                        to="core.fileprocess",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-created_at'],
+                "ordering": ["-created_at"],
             },
         ),
     ]

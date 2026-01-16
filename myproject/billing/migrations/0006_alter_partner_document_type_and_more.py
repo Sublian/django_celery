@@ -6,18 +6,30 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('billing', '0005_remove_company_name_remove_company_vat'),
+        ("billing", "0005_remove_company_name_remove_company_vat"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='partner',
-            name='document_type',
-            field=models.CharField(choices=[('dni', 'DNI'), ('ruc', 'RUC'), ('ce', 'Carnet de Extranjería'), ('pasaporte', 'Pasaporte'), ('otro', 'Otro')], default='dni', max_length=20),
+            model_name="partner",
+            name="document_type",
+            field=models.CharField(
+                choices=[
+                    ("dni", "DNI"),
+                    ("ruc", "RUC"),
+                    ("ce", "Carnet de Extranjería"),
+                    ("pasaporte", "Pasaporte"),
+                    ("otro", "Otro"),
+                ],
+                default="dni",
+                max_length=20,
+            ),
         ),
         migrations.AlterField(
-            model_name='partner',
-            name='num_document',
-            field=models.CharField(blank=True, max_length=20, null=True, verbose_name='Número de Documento'),
+            model_name="partner",
+            name="num_document",
+            field=models.CharField(
+                blank=True, max_length=20, null=True, verbose_name="Número de Documento"
+            ),
         ),
     ]

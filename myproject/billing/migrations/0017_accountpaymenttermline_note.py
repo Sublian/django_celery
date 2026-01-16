@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('billing', '0016_accountmove_billing_acc_company_9fd468_idx_and_more'),
+        ("billing", "0016_accountmove_billing_acc_company_9fd468_idx_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='accountpaymenttermline',
-            name='note',
+            model_name="accountpaymenttermline",
+            name="note",
             field=models.TextField(blank=True, null=True),
         ),
     ]

@@ -8,28 +8,44 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('billing', '0002_remove_partner_user_partner_companies'),
+        ("billing", "0002_remove_partner_user_partner_companies"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='partner',
-            name='vat',
+            model_name="partner",
+            name="vat",
         ),
         migrations.AddField(
-            model_name='company',
-            name='active',
-            field=models.BooleanField(default=True, verbose_name='Activo'),
+            model_name="company",
+            name="active",
+            field=models.BooleanField(default=True, verbose_name="Activo"),
         ),
         migrations.AddField(
-            model_name='partner',
-            name='document_type',
-            field=models.CharField(choices=[('dni', 'DNI'), ('ruc', 'RUC'), ('ce', 'Carnet Extranjería'), ('passport', 'Pasaporte')], default='dni', max_length=20),
+            model_name="partner",
+            name="document_type",
+            field=models.CharField(
+                choices=[
+                    ("dni", "DNI"),
+                    ("ruc", "RUC"),
+                    ("ce", "Carnet Extranjería"),
+                    ("passport", "Pasaporte"),
+                ],
+                default="dni",
+                max_length=20,
+            ),
         ),
         migrations.AddField(
-            model_name='partner',
-            name='user',
-            field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='partner_profile', to=settings.AUTH_USER_MODEL, verbose_name='Usuario Asociado'),
+            model_name="partner",
+            name="user",
+            field=models.OneToOneField(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="partner_profile",
+                to=settings.AUTH_USER_MODEL,
+                verbose_name="Usuario Asociado",
+            ),
         ),
     ]

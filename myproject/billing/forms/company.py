@@ -3,7 +3,7 @@ from billing.models import Company
 
 
 class CompanyForm(forms.ModelForm):
-    
+
     class Meta:
         model = Company
         # fields = ["name", "vat", "email", "sequence", "active"]
@@ -18,9 +18,13 @@ class CompanyForm(forms.ModelForm):
             "report_footer": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "email": forms.EmailInput(attrs={"class": "form-control"}),
             "currency": forms.Select(attrs={"class": "form-select"}),
-            "tax_calculation_rounding_method": forms.Select(attrs={"class": "form-select"}),
+            "tax_calculation_rounding_method": forms.Select(
+                attrs={"class": "form-select"}
+            ),
             "account_tax_periodicity": forms.Select(attrs={"class": "form-select"}),
-            "account_tax_periodicity_reminder_day": forms.NumberInput(attrs={"class": "form-control"}),
+            "account_tax_periodicity_reminder_day": forms.NumberInput(
+                attrs={"class": "form-control"}
+            ),
             "sunat_amount": forms.NumberInput(attrs={"class": "form-control"}),
             "currency_provider": forms.TextInput(attrs={"class": "form-control"}),
             "theme_color": forms.TextInput(attrs={"class": "form-control"}),
@@ -31,7 +35,6 @@ class CompanyForm(forms.ModelForm):
             "active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
-    
     def clean_partner(self):
         partner = self.cleaned_data.get("partner")
 
@@ -46,4 +49,3 @@ class CompanyForm(forms.ModelForm):
             )
 
         return partner
-    

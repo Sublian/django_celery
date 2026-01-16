@@ -7,13 +7,15 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('billing', '0021_remove_partner_ruc_condition_and_more'),
+        ("billing", "0021_remove_partner_ruc_condition_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='partner',
-            index=models.Index(fields=['num_document'], name='billing_par_num_doc_d1290c_idx'),
+            model_name="partner",
+            index=models.Index(
+                fields=["num_document"], name="billing_par_num_doc_d1290c_idx"
+            ),
         ),
     ]

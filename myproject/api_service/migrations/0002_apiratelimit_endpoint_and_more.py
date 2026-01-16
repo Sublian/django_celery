@@ -8,30 +8,49 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api_service', '0001_initial'),
+        ("api_service", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='apiratelimit',
-            name='endpoint',
-            field=models.ForeignKey(blank=True, help_text='Endpoint específico (null para límite general del servicio)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='rate_limits', to='api_service.apiendpoint'),
+            model_name="apiratelimit",
+            name="endpoint",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="Endpoint específico (null para límite general del servicio)",
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="rate_limits",
+                to="api_service.apiendpoint",
+            ),
         ),
         migrations.AlterField(
-            model_name='apiendpoint',
-            name='custom_rate_limit',
-            field=models.IntegerField(blank=True, help_text='Límite personalizado para este endpoint (sobrescribe el del servicio)', null=True, validators=[django.core.validators.MinValueValidator(1), django.core.validators.MaxValueValidator(1000)]),
+            model_name="apiendpoint",
+            name="custom_rate_limit",
+            field=models.IntegerField(
+                blank=True,
+                help_text="Límite personalizado para este endpoint (sobrescribe el del servicio)",
+                null=True,
+                validators=[
+                    django.core.validators.MinValueValidator(1),
+                    django.core.validators.MaxValueValidator(1000),
+                ],
+            ),
         ),
         migrations.AlterUniqueTogether(
-            name='apiratelimit',
-            unique_together={('service', 'endpoint')},
+            name="apiratelimit",
+            unique_together={("service", "endpoint")},
         ),
         migrations.AddIndex(
-            model_name='apiratelimit',
-            index=models.Index(fields=['service', 'endpoint'], name='api_service_service_fc432d_idx'),
+            model_name="apiratelimit",
+            index=models.Index(
+                fields=["service", "endpoint"], name="api_service_service_fc432d_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='apiratelimit',
-            index=models.Index(fields=['minute_window_start'], name='api_service_minute__ddd80e_idx'),
+            model_name="apiratelimit",
+            index=models.Index(
+                fields=["minute_window_start"], name="api_service_minute__ddd80e_idx"
+            ),
         ),
     ]
