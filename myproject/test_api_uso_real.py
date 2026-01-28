@@ -422,7 +422,7 @@ def test_particion_rucs():
 
             # Mostrar información de cada lote
             for i, lote in enumerate(lotes):
-                print(f"   📦 Lote {i+1}: {len(lote)} RUCs")
+                print(f"   📦 Lote {i + 1}: {len(lote)} RUCs")
                 if i == 0:
                     print(f"      Primer RUC: {lote[0]}")
                     print(f"      Último RUC: {lote[-1]}")
@@ -527,9 +527,7 @@ def test_todos_endpoints():
                                     print(f"   🔍 RUCs no habilitados:")
                                     for item in analisis["no_habilitados_facturacion"][
                                         "items"
-                                    ][
-                                        :3
-                                    ]:  # Mostrar primeros 3
+                                    ][:3]:  # Mostrar primeros 3
                                         print(
                                             f"      • {item['ruc']}: {item['razon_social'][:30]}... - Motivos: {', '.join(item['motivos'])}"
                                         )
@@ -717,7 +715,9 @@ def test_todos_endpoints():
         print(f"\n📊 Resumen endpoints:")
         print(f"   Probados: {endpoints_probadps}")
         print(f"   Exitosos: {endpoints_exitosos}")
-        print(f"   Tasa éxito: {endpoints_exitosos/max(endpoints_probadps,1)*100:.1f}%")
+        print(
+            f"   Tasa éxito: {endpoints_exitosos / max(endpoints_probadps, 1) * 100:.1f}%"
+        )
 
         return endpoints_exitosos > 0
 
@@ -1024,7 +1024,9 @@ def main():
             estado = (
                 "🟢"
                 if log.status == "SUCCESS"
-                else "🔴" if log.status == "FAILED" else "🟡"
+                else "🔴"
+                if log.status == "FAILED"
+                else "🟡"
             )
             print(
                 f"{estado} {log.endpoint.name if log.endpoint else 'N/A'} - {log.status} - {log.created_at.time()}"

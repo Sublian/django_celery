@@ -96,7 +96,7 @@ class Command(BaseCommand):
         self.stdout.write(f"   📄 Términos activos: {total_terms}")
         self.stdout.write(f"   📝 Líneas totales: {total_lines}")
         self.stdout.write(
-            f"   📈 Promedio líneas/término: {total_lines/max(total_terms, 1):.1f}"
+            f"   📈 Promedio líneas/término: {total_lines / max(total_terms, 1):.1f}"
         )
 
         # Mostrar issues
@@ -111,16 +111,16 @@ class Command(BaseCommand):
                 for issue in errors:
                     if "term" in issue:
                         self.stdout.write(
-                            f'   • {issue["company"]} - {issue["term"]}: {issue["issue"]}'
+                            f"   • {issue['company']} - {issue['term']}: {issue['issue']}"
                         )
                     else:
-                        self.stdout.write(f'   • {issue["company"]}: {issue["issue"]}')
+                        self.stdout.write(f"   • {issue['company']}: {issue['issue']}")
 
             if warnings:
                 self.stdout.write(self.style.WARNING("\n⚠️  ADVERTENCIAS:"))
                 for issue in warnings:
                     self.stdout.write(
-                        f'   • {issue["company"]} - {issue["term"]}: {issue["issue"]}'
+                        f"   • {issue['company']} - {issue['term']}: {issue['issue']}"
                     )
 
             self.stdout.write(f"\n💡 Recomendaciones:")

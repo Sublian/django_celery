@@ -82,8 +82,8 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f'✅ {result["posted"]} facturas posteadas, '
-                f'{result["failed"]} fallidas (validación)'
+                f"✅ {result['posted']} facturas posteadas, "
+                f"{result['failed']} fallidas (validación)"
             )
         )
 

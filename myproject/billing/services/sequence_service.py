@@ -81,7 +81,6 @@ class SequenceService:
         """Genera la próxima referencia - VERSIÓN CORREGIDA - Versión con reintentos"""
         for attempt in range(retries):
             try:
-
                 sequence = self.get_sequence(sequence_type, company, document_type)
                 # logger.info(f"   🔄️ Obtained sequence: {sequence.code} for company {company}")
 
@@ -182,7 +181,6 @@ class SequenceService:
 
         for sequence in sequences:
             try:
-
                 last_used = sequence.get_last_used_number()
                 if last_used is not None and sequence.number_next <= last_used:
                     inconsistencies.append(

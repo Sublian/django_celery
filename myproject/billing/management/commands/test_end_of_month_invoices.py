@@ -70,7 +70,7 @@ class Command(BaseCommand):
             ).count()
 
             self.stdout.write(
-                f"   👥 Clientes con pago fin de mes: {end_of_month_clients}/{total_clients} ({(end_of_month_clients/total_clients*100 if total_clients > 0 else 0):.1f}%)"
+                f"   👥 Clientes con pago fin de mes: {end_of_month_clients}/{total_clients} ({(end_of_month_clients / total_clients * 100 if total_clients > 0 else 0):.1f}%)"
             )
 
             # Mostrar algunos clientes como ejemplo
@@ -258,13 +258,13 @@ class Command(BaseCommand):
                                 f"      ✅ {client.name}: {invoice.invoice_number}"
                             )
                             self.stdout.write(
-                                f'          Emisión: {invoice.invoice_date.strftime("%d/%m/%Y")}'
+                                f"          Emisión: {invoice.invoice_date.strftime('%d/%m/%Y')}"
                             )
                             self.stdout.write(
-                                f'          Vence: {invoice.invoice_date_due.strftime("%d/%m/%Y") if invoice.invoice_date_due else "N/A"}'
+                                f"          Vence: {invoice.invoice_date_due.strftime('%d/%m/%Y') if invoice.invoice_date_due else 'N/A'}"
                             )
                             self.stdout.write(
-                                f'          Días: {(invoice.invoice_date_due - invoice.invoice_date).days if invoice.invoice_date_due else "N/A"}'
+                                f"          Días: {(invoice.invoice_date_due - invoice.invoice_date).days if invoice.invoice_date_due else 'N/A'}"
                             )
                     except Exception as e:
                         self.stdout.write(f"      ❌ Error: {str(e)}")
@@ -283,10 +283,10 @@ class Command(BaseCommand):
                                 f"      ✅ {client.name}: {invoice.invoice_number}"
                             )
                             self.stdout.write(
-                                f'          Emisión: {invoice.invoice_date.strftime("%d/%m/%Y")}'
+                                f"          Emisión: {invoice.invoice_date.strftime('%d/%m/%Y')}"
                             )
                             self.stdout.write(
-                                f'          Vence: {invoice.invoice_date_due.strftime("%d/%m/%Y") if invoice.invoice_date_due else "N/A"}'
+                                f"          Vence: {invoice.invoice_date_due.strftime('%d/%m/%Y') if invoice.invoice_date_due else 'N/A'}"
                             )
                     except Exception as e:
                         self.stdout.write(f"      ❌ Error: {str(e)}")

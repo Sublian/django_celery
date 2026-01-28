@@ -135,14 +135,14 @@ def test_rate_limiting():
             try:
                 resultado = client.consultar_cuenta()
                 print(
-                    f"   Llamada {i+1}: {'✅ Éxito' if resultado.get('success') else '⚠️ API falló'}"
+                    f"   Llamada {i + 1}: {'✅ Éxito' if resultado.get('success') else '⚠️ API falló'}"
                 )
             except Exception as e:
                 if "rate limit" in str(e).lower() or "RateLimitExceededError" in str(e):
-                    print(f"   Llamada {i+1}: ⏸️ Rate limit excedido (esperado)")
+                    print(f"   Llamada {i + 1}: ⏸️ Rate limit excedido (esperado)")
                     errores_rate_limit += 1
                 else:
-                    print(f"   Llamada {i+1}: ❌ Error inesperado: {e}")
+                    print(f"   Llamada {i + 1}: ❌ Error inesperado: {e}")
 
         if errores_rate_limit > 0:
             print(
@@ -189,14 +189,16 @@ def test_rate_limiting_intensivo():
                 if resultado.get("success"):
                     exitosas += 1
                     if exitosas % 10 == 0:
-                        print(f"  Llamada {i+1}: ✅ Éxito ({exitosas} exitosas)")
+                        print(f"  Llamada {i + 1}: ✅ Éxito ({exitosas} exitosas)")
             except RateLimitExceededError:
                 rate_limited += 1
-                print(f"  Llamada {i+1}: ⏸️ Rate limit excedido (total: {rate_limited})")
+                print(
+                    f"  Llamada {i + 1}: ⏸️ Rate limit excedido (total: {rate_limited})"
+                )
                 break  # Salir cuando se active rate limiting
             except Exception as e:
                 otros_errores += 1
-                print(f"  Llamada {i+1}: ❌ {type(e).__name__}")
+                print(f"  Llamada {i + 1}: ❌ {type(e).__name__}")
 
         print(f"\nResumen:")
         print(f"  ✅ Exitosas: {exitosas}")
@@ -558,7 +560,7 @@ def verificar_trazabilidad_completa():
     print("-" * 80)
 
     for i, log in enumerate(logs[:3]):  # Analizar solo los 3 más recientes
-        print(f"\nLog #{i+1}: {log.id}")
+        print(f"\nLog #{i + 1}: {log.id}")
         print(f"  Servicio: {log.service.name}")
         print(f"  Endpoint: {log.endpoint.name if log.endpoint else 'N/A'}")
         print(f"  Estado: {log.status}")
@@ -589,8 +591,8 @@ def verificar_trazabilidad_completa():
     fallidos = logs.filter(status="FAILED").count()
 
     print(f"Total logs: {total}")
-    print(f"Exitosos: {exitosos} ({exitosos/total*100:.1f}%)")
-    print(f"Fallidos: {fallidos} ({fallidos/total*100:.1f}%)")
+    print(f"Exitosos: {exitosos} ({exitosos / total * 100:.1f}%)")
+    print(f"Fallidos: {fallidos} ({fallidos / total * 100:.1f}%)")
 
     # Endpoints más usados
     from django.db.models import Count

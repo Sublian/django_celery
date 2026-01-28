@@ -18,7 +18,7 @@ class Command(BaseCommand):
             for doc_type in ["invoice", "ticket"]:
                 sequence_code = f"account.move.{doc_type}.{company.id}"
                 prefix = "F001-" if doc_type == "invoice" else "B001-"
-                name = f'Secuencia {"Facturas" if doc_type == "invoice" else "Boletas"} - {company}'
+                name = f"Secuencia {'Facturas' if doc_type == 'invoice' else 'Boletas'} - {company}"
 
                 sequence, created = Sequence.objects.get_or_create(
                     code=sequence_code,

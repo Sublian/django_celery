@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("billing", "0018_contracttemplate_payment_term_partner_payment_term_and_more"),
     ]

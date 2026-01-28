@@ -3,7 +3,6 @@ from billing.models import Company
 
 
 class CompanyForm(forms.ModelForm):
-
     class Meta:
         model = Company
         # fields = ["name", "vat", "email", "sequence", "active"]

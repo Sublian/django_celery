@@ -343,7 +343,7 @@ class BatchInvoiceService:
             logger.info(f"📝 Secuencia creada: {sequence_code} para {company.name}")
 
         # Buscar diario existente
-        journal_code = f'VNT{"F" if document_type == "invoice" else "B"}_{company.id}'
+        journal_code = f"VNT{'F' if document_type == 'invoice' else 'B'}_{company.id}"
         journal = Journal.objects.filter(code=journal_code, company=company).first()
 
         if not journal:

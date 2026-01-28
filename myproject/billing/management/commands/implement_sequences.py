@@ -33,7 +33,7 @@ class Command(BaseCommand):
 
                 if last_invoice:
                     self.stdout.write(
-                        f"   📄 Última {'factura' if doc_type =='invoice' else 'boleta'}: {last_invoice.invoice_number}"
+                        f"   📄 Última {'factura' if doc_type == 'invoice' else 'boleta'}: {last_invoice.invoice_number}"
                     )
 
                 if created:

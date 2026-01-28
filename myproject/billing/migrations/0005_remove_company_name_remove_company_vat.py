@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("billing", "0004_company_account_tax_periodicity_and_more"),
     ]

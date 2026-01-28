@@ -123,7 +123,7 @@ class MigoAPIClient:
                 endpoint=endpoint_obj,
                 status="RATE_LIMITED",
                 request_data=request_data,
-                error_message=f'Rate limit excedido. Límite: {limit}/min. Esperar: {wait_time}s. Endpoint intentado: {endpoint_name or "unknown"}',
+                error_message=f"Rate limit excedido. Límite: {limit}/min. Esperar: {wait_time}s. Endpoint intentado: {endpoint_name or 'unknown'}",
                 called_from=caller_info,
                 response_code=429,
             )
@@ -797,7 +797,9 @@ class MigoAPIClient:
 
             # Procesar cada lote
             for i, lote in enumerate(lotes):
-                logger.info(f"Procesando lote {i+1}/{len(lotes)} con {len(lote)} RUCs")
+                logger.info(
+                    f"Procesando lote {i + 1}/{len(lotes)} con {len(lote)} RUCs"
+                )
 
                 try:
                     # Consultar el lote actual
@@ -851,7 +853,7 @@ class MigoAPIClient:
                         time.sleep(2)
 
                 except Exception as e:
-                    logger.error(f"Error procesando lote {i+1}: {str(e)}")
+                    logger.error(f"Error procesando lote {i + 1}: {str(e)}")
                     total_fallidos += len(lote)
                     total_procesados += len(lote)
 

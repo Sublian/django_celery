@@ -178,10 +178,10 @@ class Command(BaseCommand):
 
         self.stdout.write(f"   • Total facturas: {total_facturas}")
         self.stdout.write(
-            f"   • Con pago fin de mes: {con_pago_fin_mes} ({(con_pago_fin_mes/total_facturas*100):.1f}%)"
+            f"   • Con pago fin de mes: {con_pago_fin_mes} ({(con_pago_fin_mes / total_facturas * 100):.1f}%)"
         )
         self.stdout.write(
-            f"   • Con hotfix aplicado: {con_hotfix} ({(con_hotfix/total_facturas*100):.1f}%)"
+            f"   • Con hotfix aplicado: {con_hotfix} ({(con_hotfix / total_facturas * 100):.1f}%)"
         )
 
         # Estadísticas por mes
@@ -221,7 +221,7 @@ class Command(BaseCommand):
                     else 0
                 )
                 self.stdout.write(
-                    f'      • {nombre_mes}: {stats["total"]} facturas, {stats["hotfix"]} hotfix ({porcentaje:.1f}%)'
+                    f"      • {nombre_mes}: {stats['total']} facturas, {stats['hotfix']} hotfix ({porcentaje:.1f}%)"
                 )
 
         # Montos totales

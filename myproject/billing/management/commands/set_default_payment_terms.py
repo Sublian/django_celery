@@ -181,7 +181,6 @@ class Command(BaseCommand):
     def _update_partners_payment_terms(self, company, default_term, dry_run=False):
         """Actualizar términos de pago en partners"""
         try:
-
             # Solo clientes sin término de pago
             partners = Partner.objects.filter(
                 companies=company, is_customer=True, payment_term__isnull=True
@@ -226,7 +225,6 @@ class Command(BaseCommand):
     def _update_subscriptions_payment_terms(self, company, dry_run=False):
         """Actualizar términos de pago en suscripciones"""
         try:
-
             subscriptions = SaleSubscription.objects.filter(
                 company=company, is_active=True, payment_term__isnull=True
             )
@@ -281,7 +279,6 @@ class Command(BaseCommand):
     def _update_invoices_payment_terms(self, company, dry_run=False):
         """Actualizar términos de pago en facturas"""
         try:
-
             invoices = AccountMove.objects.filter(
                 company=company,
                 type="out_invoice",  # Solo facturas de cliente

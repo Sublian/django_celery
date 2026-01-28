@@ -71,9 +71,7 @@ class Command(BaseCommand):
         service = SequenceService()
         partners = Partner.objects.filter(
             companies=company, is_customer=True, is_active=True
-        )[
-            : count * 2
-        ]  # Tomar más partners de los necesarios
+        )[: count * 2]  # Tomar más partners de los necesarios
 
         journals = Journal.objects.filter(company=company, is_active=True)
         series = InvoiceSerie.objects.filter(company=company, is_active=True)
@@ -183,7 +181,7 @@ class Command(BaseCommand):
                     else "Sin vencimiento"
                 )
                 self.stdout.write(
-                    f'   ✅ {reference}: {partner.name} - ${total_amount:.2f} - {payment_term.name if payment_term else "Sin término"} - {due_info}'
+                    f"   ✅ {reference}: {partner.name} - ${total_amount:.2f} - {payment_term.name if payment_term else 'Sin término'} - {due_info}"
                 )
 
             except Exception as e:

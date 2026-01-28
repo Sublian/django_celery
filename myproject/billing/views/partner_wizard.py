@@ -70,7 +70,6 @@ class PartnerWizardFinish(WizardSessionRequiredMixin, TemplateView):
     required_key = "partner_step1"
 
     def get(self, request, *args, **kwargs):
-
         data1 = request.session.get("partner_step1")
         data2 = request.session.get("partner_step2")
         data3 = request.session.get("partner_step3")

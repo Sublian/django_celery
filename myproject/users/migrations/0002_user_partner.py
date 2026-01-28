@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("billing", "0002_remove_partner_user_partner_companies"),
         ("users", "0001_initial"),

@@ -70,9 +70,7 @@ class Command(BaseCommand):
             # Obtener partners de esta compañía usando la relación ManyToMany
             company_partners = Partner.objects.filter(
                 company=company, is_customer=True, is_active=True
-            )[
-                :max_per_company
-            ]  # Limitar al máximo por compañía
+            )[:max_per_company]  # Limitar al máximo por compañía
 
             if not company_partners.exists():
                 self.stdout.write(f"    ⚠️ No hay clientes para la compañía: {company}")

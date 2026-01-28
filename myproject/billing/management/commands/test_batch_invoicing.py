@@ -58,7 +58,6 @@ class Command(BaseCommand):
             return
 
         if company_id:
-
             service = InvoiceProcessingService(company_id=options.get("company"))
 
             if options.get("list_pending"):
@@ -172,8 +171,8 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f'✅ {result["posted"]} facturas posteadas, '
-                f'✖️ {result["failed"]} fallidas (validación)'
+                f"✅ {result['posted']} facturas posteadas, "
+                f"✖️ {result['failed']} fallidas (validación)"
             )
         )
 

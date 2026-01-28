@@ -445,7 +445,6 @@ def obtener_rucs_para_validacion():
     # 1. Partners activos de la BD
     partners_rucs = []
     try:
-
         partners = Partner.objects.filter(
             document_type="ruc", is_active=True
         ).values_list("num_document", flat=True)
@@ -657,7 +656,7 @@ def validar_rucs_con_cache(ruc_list, max_lotes=2, max_reintentos=1):
     rucs_omitidos = []
 
     for i, lote in enumerate(lotes):
-        print(f"  Lote {i+1}/{len(lotes)}: {len(lote)} RUCs")
+        print(f"  Lote {i + 1}/{len(lotes)}: {len(lote)} RUCs")
 
         try:
             if i > 0:
@@ -694,7 +693,7 @@ def validar_rucs_con_cache(ruc_list, max_lotes=2, max_reintentos=1):
                                 "valido_facturacion": es_valido,
                                 "fuente": "api_migo",
                                 "cacheado": False,
-                                "lote": f"inicial_{i+1}",
+                                "lote": f"inicial_{i + 1}",
                             }
 
                             resultados.append(validacion)
@@ -720,7 +719,7 @@ def validar_rucs_con_cache(ruc_list, max_lotes=2, max_reintentos=1):
                                 "error": "RUC omitido en respuesta inicial de API",
                                 "fuente": "api_omitido",
                                 "cacheado": False,
-                                "lote": f"inicial_{i+1}",
+                                "lote": f"inicial_{i + 1}",
                             }
                         )
 
@@ -738,7 +737,7 @@ def validar_rucs_con_cache(ruc_list, max_lotes=2, max_reintentos=1):
                             "error": resultado_lote.get("error", "Error en lote"),
                             "fuente": "error_lote",
                             "cacheado": False,
-                            "lote": f"inicial_{i+1}_error",
+                            "lote": f"inicial_{i + 1}_error",
                         }
                     )
 
@@ -755,7 +754,7 @@ def validar_rucs_con_cache(ruc_list, max_lotes=2, max_reintentos=1):
                         "error": str(e),
                         "fuente": "excepcion",
                         "cacheado": False,
-                        "lote": f"inicial_{i+1}_excepcion",
+                        "lote": f"inicial_{i + 1}_excepcion",
                     }
                 )
 
@@ -817,7 +816,7 @@ def validar_rucs_con_cache(ruc_list, max_lotes=2, max_reintentos=1):
                 if reintentos_realizados >= max_reintentos:
                     break
 
-                print(f"    Reintento individual {i+1}: RUC {ruc}")
+                print(f"    Reintento individual {i + 1}: RUC {ruc}")
 
                 try:
                     time.sleep(1)  # Pequeña pausa entre consultas
@@ -970,7 +969,7 @@ def generar_reporte_facturacion(tipo_cambio, validacion_rucs):
             estado = ruc.get("estado", "DESCONOCIDO")
             condicion = ruc.get("condicion", "DESCONOCIDO")
 
-            print(f"   {i+1}. {ruc.get('ruc', '')}: {razon}...")
+            print(f"   {i + 1}. {ruc.get('ruc', '')}: {razon}...")
             print(f"      Estado: {estado}, Condición: {condicion}")
 
             if ruc.get("error"):

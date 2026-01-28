@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("billing", "0020_remove_currencyrate_rate_alter_partner_num_document"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

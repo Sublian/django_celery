@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("billing", "0016_accountmove_billing_acc_company_9fd468_idx_and_more"),
     ]

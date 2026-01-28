@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("billing", "0002_remove_partner_user_partner_companies"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
