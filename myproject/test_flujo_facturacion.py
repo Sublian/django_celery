@@ -1123,11 +1123,11 @@ def main():
     print("4. Generar reporte desde archivo JSON")
     print("5. Limpiar cache")
     print("6. Mostrar contenido del cache (DEBUG)")
+    print("7. DEBUG PROFUNDO DEL CACHE...")
     print("0. Salir")
 
     try:
-        opcion = input("\nSeleccione opción (0-5): ").strip()
-
+        opcion = input("\nSeleccione opción (0-7): ").strip()
         if opcion == "1":
             print("\n▶️  INICIANDO FLUJO COMPLETO DE FACTURACIÓN")
             resultado = flujo_completo_facturacion(max_lotes=2)

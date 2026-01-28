@@ -186,6 +186,13 @@ class ApiEndpoint(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(1000)],
         help_text="Límite personalizado para este endpoint (sobrescribe el del servicio)",
     )
+    
+    timeout = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(300)],
+        help_text="Tiempo de espera máximo en segundos para las peticiones a este endpoint",
+    )
 
     class Meta:
         verbose_name = "Endpoint API"
