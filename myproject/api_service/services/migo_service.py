@@ -105,31 +105,32 @@ class MigoAPIService:
         try:
             endpoint = self._get_endpoint(endpoint_name)
             if endpoint:
-                rate_limit, created = ApiRateLimit.objects.get_or_create(
-                    endpoint=endpoint,
-                    defaults={'remaining_calls': endpoint.custom_rate_limit or self.service.requests_per_minute}
+                # Obtener o crear el registro de rate limit para este endpoint
+                rate_limit, created = ApiRateLimit.get_for_service_endpoint(
+                    self.service, endpoint
                 )
                 
-                if rate_limit.remaining_calls <= 0:
-                    reset_time = rate_limit.last_reset + timedelta(minutes=1)
-                    if timezone.now() > reset_time:
-                        rate_limit.remaining_calls = endpoint.custom_rate_limit or self.service.requests_per_minute
-                        rate_limit.last_reset = timezone.now()
-                        rate_limit.save()
-                    else:
-                        wait_seconds = (reset_time - timezone.now()).total_seconds()
-                        return False, wait_seconds
-                
-                return True, 0
+                # Usar el método can_make_request() del modelo
+                if rate_limit.can_make_request():
+                    return True, 0
+                else:
+                    # Si no se puede hacer la petición, obtener tiempo de espera
+                    wait_seconds = rate_limit.get_wait_time()
+                    logger.warning(
+                        f"Rate limit excedido para endpoint {endpoint_name}. "
+                        f"Esperar {wait_seconds:.1f} segundos"
+                    )
+                    return False, wait_seconds
         except Exception as e:
             logger.error(f"Error checking rate limit: {str(e)}")
         
+        # Por defecto, permitir la petición si hay error
         return True, 0
     
     def _update_rate_limit(self, endpoint_name: str) -> None:
         """
         Actualiza rate limit después de una llamada.
-        FUNCIÓN EXISTENTE: Mantenida sin cambios.
+        Incrementa el contador de peticiones realizadas.
         
         Args:
             endpoint_name: Nombre del endpoint
@@ -137,14 +138,17 @@ class MigoAPIService:
         try:
             endpoint = self._get_endpoint(endpoint_name)
             if endpoint:
-                rate_limit, created = ApiRateLimit.objects.get_or_create(
-                    endpoint=endpoint,
-                    defaults={'remaining_calls': endpoint.custom_rate_limit or self.service.requests_per_minute}
+                # Obtener o crear el registro de rate limit para este endpoint
+                rate_limit, created = ApiRateLimit.get_for_service_endpoint(
+                    self.service, endpoint
                 )
                 
-                if rate_limit.remaining_calls > 0:
-                    rate_limit.remaining_calls -= 1
-                    rate_limit.save()
+                # Usar el método increment_count() del modelo
+                rate_limit.increment_count()
+                logger.debug(
+                    f"Rate limit actualizado para endpoint {endpoint_name}. "
+                    f"Conteo actual: {rate_limit.current_count}/{rate_limit.get_limit()}"
+                )
         except Exception as e:
             logger.error(f"Error updating rate limit: {str(e)}")
     
