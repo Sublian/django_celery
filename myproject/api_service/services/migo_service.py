@@ -1349,168 +1349,6 @@ class MigoAPIService:
             )
             raise Exception(error_msg)
 
-    def consultar_ruc_masivo(self, ruc_list, batch_id=None):
-        """
-        Consulta masiva de RUCs (máximo 100 por llamada)
-        Args:
-            ruc_list: Lista de RUCs a consultar
-            batch_id: ID de ApiBatchRequest para tracking
-        Returns:
-            dict con resultados y estadísticas
-        """
-        # Validar y normalizar entrada
-        if not isinstance(ruc_list, list):
-            raise ValueError("ruc_list debe ser una lista")
-
-        if len(ruc_list) > 100:
-            raise ValueError("Máximo 100 RUCs por consulta masiva")
-
-        # Normalizar RUCs a strings y limpiar
-        cleaned_ruc_list = []
-        for ruc in ruc_list:
-            if isinstance(ruc, (int, float)):
-                ruc = str(int(ruc))  # Convertir números a string sin decimales
-            elif isinstance(ruc, str):
-                ruc = ruc.strip()  # Limpiar espacios
-            else:
-                raise ValueError(f"Tipo de dato no válido para RUC: {type(ruc)}")
-
-            # Validar formato básico de RUC (11 dígitos para Perú)
-            if len(ruc) != 11 or not ruc.isdigit():
-                raise ValueError(f"RUC inválido: {ruc}. Debe tener 11 dígitos")
-
-            cleaned_ruc_list.append(ruc)
-
-        # Registrar batch request si se proporciona batch_id
-        batch_request = None
-        if batch_id:
-            try:
-                batch_request = ApiBatchRequest.objects.get(id=batch_id)
-                batch_request.status = "PROCESSING"
-                batch_request.total_items = len(cleaned_ruc_list)
-                batch_request.processed_items = 0
-                batch_request.successful_items = 0
-                batch_request.failed_items = 0
-                batch_request.save()
-            except ApiBatchRequest.DoesNotExist:
-                pass
-
-        try:
-            # Usar el método _make_request existente para consistencia
-            result = self._make_request(
-                endpoint_name="consulta_ruc_masivo", payload={"ruc": cleaned_ruc_list}
-            )
-
-            # PROCESAR LA LISTA DIRECTAMENTE
-            if not isinstance(result, list):
-                # Si no es una lista, hubo un error
-                return {
-                    "success": False,
-                    "error": f"Formato de respuesta inesperado: {type(result)}",
-                    "total_requested": len(cleaned_ruc_list),
-                    "total_processed": 0,
-                    "successful": 0,
-                    "failed": len(cleaned_ruc_list),
-                    "results": [],
-                    "summary": {"activos": 0, "habidos": 0},
-                    "batch_id": batch_request.id if batch_request else None,
-                }
-
-            # La API devolvió una lista de diccionarios
-            results_list = result
-
-            # Clasificar resultados
-            successful_results = []
-            failed_results = []
-
-            for item in results_list:
-                if isinstance(item, dict):
-                    # Para consultas masivas, el éxito está en la clave 'success'
-                    if item.get("success", False):
-                        successful_results.append(item)
-                    else:
-                        failed_results.append(item)
-                else:
-                    failed_results.append({"raw": item, "success": False})
-
-            # Calcular estadísticas
-            activos = len(
-                [
-                    r
-                    for r in successful_results
-                    if r.get("estado_del_contribuyente") == "ACTIVO"
-                ]
-            )
-            habidos = len(
-                [
-                    r
-                    for r in successful_results
-                    if r.get("condicion_de_domicilio") == "HABIDO"
-                ]
-            )
-
-            # ✅ NUEVO: Análisis de facturación
-            analisis_facturacion = self._analizar_facturacion(results_list)
-
-            # Actualizar batch request si existe
-            if batch_request:
-                batch_request.results = {
-                    "successful": successful_results,
-                    "failed": failed_results,
-                    "total": len(results_list),
-                    "analisis_facturacion": analisis_facturacion,  # ✅ Agregar análisis
-                }
-                batch_request.processed_items = len(results_list)
-                batch_request.successful_items = len(successful_results)
-                batch_request.failed_items = len(failed_results)
-                batch_request.status = (
-                    "COMPLETED" if len(failed_results) == 0 else "PARTIAL"
-                )
-                batch_request.completed_at = timezone.now()
-                batch_request.save()
-
-            # Retornar estadísticas
-            return {
-                "success": True,
-                "total_requested": len(cleaned_ruc_list),
-                "total_processed": len(results_list),
-                "successful": len(successful_results),
-                "failed": len(failed_results),
-                "results": results_list,
-                "summary": {
-                    "activos": activos,
-                    "habidos": habidos,
-                },
-                "analisis_facturacion": analisis_facturacion,
-                "batch_id": batch_request.id if batch_request else None,
-            }
-
-        except RateLimitExceededError as e:
-            # Manejar rate limit específicamente
-            if batch_request:
-                batch_request.status = "FAILED"
-                batch_request.error_summary = {
-                    "error": "Rate limit excedido",
-                    "wait_time": e.wait_time,
-                }
-                batch_request.completed_at = timezone.now()
-                batch_request.save()
-            raise
-
-        except Exception as e:
-            # Manejar otros errores
-            if batch_request:
-                batch_request.status = "FAILED"
-                batch_request.error_summary = {"error": str(e)}
-                batch_request.completed_at = timezone.now()
-                batch_request.save()
-
-            # Re-lanzar con contexto útil
-            error_msg = f"Error en consulta masiva de RUCs: {str(e)}"
-            error_msg += f"\nRUCs procesados: {len(cleaned_ruc_list)}"
-            error_msg += f"\nPrimeros RUCs: {cleaned_ruc_list[:3]}"
-            raise Exception(error_msg)
-
     def consultar_ruc_masivo(self, rucs: List[str], batch_size: int = 50,
                            update_partners: bool = True) -> Dict[str, Any]:
         """
@@ -1587,29 +1425,77 @@ class MigoAPIService:
                 
                 batch_response = self._make_request("consultar_ruc_masivo", data=request_data)
                 
-                if batch_response.get("success"):
-                    # Procesar respuesta masiva
+                # Procesar respuesta masiva
+                # La API puede devolver:
+                # 1. Una lista directa de diccionarios (nuevo formato)
+                # 2. Un diccionario con "data" que contiene la lista (formato legado)
+                response_data = None
+                
+                if isinstance(batch_response, list):
+                    # Caso 1: Respuesta es directamente una lista
+                    response_data = batch_response
+                elif isinstance(batch_response, dict) and batch_response.get("success"):
+                    # Caso 2: Respuesta es un diccionario con éxito
                     if isinstance(batch_response.get("data"), list):
-                        for item in batch_response["data"]:
-                            if isinstance(item, dict) and item.get("success"):
+                        response_data = batch_response["data"]
+                
+                if response_data is not None and isinstance(response_data, list):
+                    # Procesar la lista de resultados
+                    for item in response_data:
+                        if isinstance(item, dict):
+                            ruc = item.get("ruc")
+                            is_success = item.get("success", False)
+                            
+                            if is_success:
+                                # RUC válido en SUNAT
                                 resultados["validos"].append({
-                                    "ruc": item.get("ruc"),
+                                    "ruc": ruc,
                                     "data": item
                                 })
+                                
+                                # Actualizar partner si se solicita
+                                if update_partners:
+                                    self._update_partner_sunat_status(ruc, {"success": True, "data": item})
+                                
+                                # Marcar como válido removiendo del cache de inválidos si existe
+                                if self._is_ruc_marked_invalid(ruc):
+                                    self.clear_invalid_rucs_cache(ruc)
                             else:
-                                resultados["errores"].append({
-                                    "ruc": item.get("ruc") if isinstance(item, dict) else "unknown",
-                                    "error": "Error en respuesta masiva",
-                                    "type": "error"
+                                # RUC no encontrado o error en SUNAT
+                                resultados["invalidos"].append({
+                                    "ruc": ruc,
+                                    "error": item.get("error", "RUC no encontrado en SUNAT"),
+                                    "type": "invalid",
+                                    "subtype": "sunat"
                                 })
-                        resultados["api_calls"] += 1
-                    else:
-                        # Si la respuesta masiva falla, procesar individualmente
-                        self._process_batch_individually(
-                            batch, resultados, update_partners
-                        )
+                                
+                                # Marcar como inválido
+                                self._mark_ruc_as_invalid(ruc, "NO_EXISTE_SUNAT")
+                                
+                                # Actualizar partner si se solicita
+                                if update_partners:
+                                    self._update_partner_sunat_status(ruc, {"success": False, "error": item.get("error", "No encontrado")})
+                        else:
+                            # Item no es un diccionario
+                            resultados["errores"].append({
+                                "ruc": "unknown",
+                                "error": "Formato inválido en respuesta",
+                                "type": "error"
+                            })
+                    
+                    resultados["api_calls"] += 1
+                    
+                elif batch_response.get("success") is False:
+                    # API devolvió error general
+                    logger.warning(f"Error en consulta masiva: {batch_response.get('error', 'Error desconocido')}")
+                    # Procesar individualmente como fallback
+                    self._process_batch_individually(
+                        batch, resultados, update_partners
+                    )
                 else:
-                    # Si falla la consulta masiva, procesar individualmente
+                    # Respuesta inesperada
+                    logger.warning(f"Respuesta inesperada de la API: {type(batch_response)}")
+                    # Procesar individualmente como fallback
                     self._process_batch_individually(
                         batch, resultados, update_partners
                     )

@@ -575,13 +575,15 @@ class ApiRateLimit(models.Model):
         """
         now = timezone.now()
 
-        # Reiniciar contador si ha pasado más de 1 minuto desde el inicio de la ventana
-        if (now - self.minute_window_start).seconds >= 60:
+        time_diff = (now - self.minute_window_start)
+        
+        # Reiniciar contador si ha pasado más de 1 minuto
+        if time_diff.total_seconds() >= 60:
             self.current_count = 0
             self.minute_window_start = now
-            self.save()
-
-        return self.current_count < self.service.requests_per_minute
+            self.save(update_fields=['current_count', 'minute_window_start'])
+        
+        return self.current_count < self.get_limit()
 
     def increment_count(self):
         """
