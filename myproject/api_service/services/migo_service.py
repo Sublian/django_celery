@@ -515,10 +515,9 @@ class MigoAPIService:
                     partner.sunat_condition = 'NO_VERIFICADO'
                     
                     error_msg = api_response.get('error', 'RUC inválido')
-                    existing_comment = partner.sunat_comment or ""
                     
                     # Agregar nueva observación manteniendo las anteriores
-                    new_comment = f"[{timezone.now().date()}] SUNAT: {error_msg}\n{existing_comment}"
+                    new_comment = f"[{timezone.now().date()}] SUNAT: {error_msg}\n"
                     partner.sunat_comment = new_comment[:1000]  # Limitar longitud
                     
                     logger.info(f"Partner {ruc} marcado como inválido en SUNAT: {error_msg}")
@@ -538,8 +537,7 @@ class MigoAPIService:
                         partner.sunat_ubigeo = data['ubigeo'][:6]
                     
                     # Agregar observación de verificación exitosa
-                    existing_comment = partner.sunat_comment or ""
-                    new_comment = f"[{timezone.now().date()}] SUNAT: Validación exitosa\n{existing_comment}"
+                    new_comment = f"[{timezone.now().date()}] SUNAT: Validación exitosa\n"
                     partner.sunat_comment = new_comment[:1000]
                     
                     logger.info(f"Partner {ruc} actualizado con datos SUNAT válidos")

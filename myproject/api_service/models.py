@@ -513,10 +513,10 @@ class ApiRateLimit(models.Model):
     Se actualiza en tiempo real durante las llamadas.
     """
 
-    service = models.OneToOneField(
+    service = models.ForeignKey(
         ApiService,
         on_delete=models.CASCADE,
-        related_name="rate_limit_status",
+        related_name="rate_limits",
         help_text="Servicio API monitoreado",
     )
     endpoint = models.ForeignKey(
@@ -621,9 +621,16 @@ class ApiRateLimit(models.Model):
         """
         Obtiene o crea un ApiRateLimit para un servicio (y opcionalmente endpoint).
         """
-        obj, created = cls.objects.get_or_create(
-            service=service,
-            endpoint=endpoint,
-            defaults={"current_count": 0, "total_requests": 0},
-        )
+        if endpoint is None:
+            obj, created = cls.objects.get_or_create(
+                service=service,
+                endpoint__isnull=True,  # Buscar específicamente donde endpoint es NULL
+                defaults={"current_count": 0, "total_requests": 0},
+            )
+        else:
+            obj, created = cls.objects.get_or_create(
+                service=service,
+                endpoint=endpoint,
+                defaults={"current_count": 0, "total_requests": 0},
+            )
         return obj, created
