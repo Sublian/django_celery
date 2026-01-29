@@ -1,149 +1,118 @@
 """
-Servicio APIMIGO Asincrónico
-============================
+MigoAPIServiceAsync - Versión Asincrónica que Hereda de MigoAPIService
 
-Versión no bloqueante de MigoAPIService usando httpx y async/await.
+Este módulo proporciona una versión asincrónica de MigoAPIService,
+reutilizando TODA la lógica existente (validación, cache, rate limiting, logging)
+y solo haciendo async las llamadas HTTP.
 
-Características:
-- Llamadas HTTP no bloqueantes usando httpx
-- Soporte completo para async/await
-- Compatible con caché centralizado (APICacheService)
-- Rate limiting y retry automático
-- Procesamiento de lotes paralelo
-- Manejo completo de errores
-- Logging detallado
+Características Heredadas:
+✅ Validación de RUC/DNI
+✅ Cache (válidos e inválidos)
+✅ Rate limiting automático
+✅ Logging completo
+✅ Batch processing
+✅ Manejo de errores
+✅ Actualización de partners
+✅ Todos los métodos de negocio
 
-Uso:
-    import asyncio
-    
-    async def main():
-        service = MigoAPIServiceAsync()
-        result = await service.consultar_ruc_async('20100038146')
-        print(result)
-    
-    asyncio.run(main())
+Cambios Mínimos:
+✅ Método _make_request_async() para llamadas HTTP async
+✅ Usa httpx en lugar de requests
+✅ Métodos principales son async
 
-Para uso en Django:
-    from asgiref.sync import async_to_sync
-    
-    # Convertir async a sync si es necesario
-    result = async_to_sync(service.consultar_ruc_async)('20100038146')
+Status: ✅ Reutiliza lógica existente + Async HTTP
 """
 
-import httpx
 import asyncio
+import httpx
 import logging
+from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple
-# from concurrent.futures import asyncio as async_futures
 
-from django.db import transaction
 from django.utils import timezone
-from django.conf import settings
 
+from .migo_service import MigoAPIService
 from .cache_service import APICacheService
-from .migo_service import MigoAPIService  # Para heredar configuración
-from billing.models import Partner
-from ..models import ApiService, ApiEndpoint, ApiCallLog, ApiRateLimit, ApiBatchRequest
-from ..exceptions import APIError, RateLimitExceededError
+from ..models import ApiEndpoint, ApiCallLog, ApiBatchRequest
 
 logger = logging.getLogger(__name__)
 
 
-class MigoAPIServiceAsync:
+class MigoAPIServiceAsync(MigoAPIService):
     """
-    Cliente APIMIGO con soporte para operaciones asincrónicas no bloqueantes.
+    Cliente APIMIGO Asincrónico - Hereda de MigoAPIService.
     
-    Características:
-    - Llamadas HTTP async usando httpx
-    - Procesamiento paralelo de lotes
-    - Compatible con cache centralizado
-    - Rate limiting respetado
-    - Reintentos automáticos con backoff exponencial
+    Reutiliza:
+    - Inicialización (__init__)
+    - Validación (_validate_ruc_format, _validate_dni_format)
+    - Cache (_is_ruc_marked_invalid, _mark_ruc_as_invalid, etc.)
+    - Rate limiting (_check_rate_limit, _update_rate_limit)
+    - Logging (_log_api_call, _get_caller_info)
+    - Todos los métodos de negocio (consultar_ruc, consultar_dni, etc.)
+    
+    Sobrescribe:
+    - _make_request_async() → ahora es async
+    - Métodos que llaman a _make_request() → ahora son async
+    
+    Uso:
+        async with MigoAPIServiceAsync() as service:
+            result = await service.consultar_ruc_async('20100038146')
     """
     
-    # Reutilizar constantes del servicio sincrónico
-    INVALID_RUCS_CACHE_KEY = MigoAPIService.INVALID_RUCS_CACHE_KEY
-    INVALID_RUC_TTL_HOURS = MigoAPIService.INVALID_RUC_TTL_HOURS
-    
-    # Configuración de async
-    TIMEOUT = 30  # Timeout en segundos
-    MAX_RETRIES = 2
-    RETRY_DELAY = 0.5  # Segundos entre reintentos
-    
-    def __init__(self, token: Optional[str] = None):
-        """
-        Inicializa el servicio async.
+    def __init__(self, token=None):
+        """Inicializa usando la lógica existente de MigoAPIService"""
+        super().__init__(token)
         
-        Args:
-            token: Token de autenticación (opcional, usa BD si no se proporciona)
-        """
-        self.service = ApiService.objects.filter(service_type="MIGO").first()
-        if not self.service:
-            raise ValueError("Servicio APIMIGO no configurado en BD")
+        # Cliente HTTP async - se crea en __aenter__
+        self.async_client: Optional[httpx.AsyncClient] = None
         
-        self.token = token or self.service.auth_token
-        self.base_url = self.service.base_url
-        self.cache_service = APICacheService()
-        self._client: Optional[httpx.AsyncClient] = None
-        
-        logger.info(f"MigoAPIServiceAsync inicializado con base_url: {self.base_url}")
+        logger.debug(f"[ASYNC] MigoAPIServiceAsync inicializado con base_url: {self.base_url}")
     
     async def __aenter__(self):
-        """Context manager para cliente HTTP async."""
-        self._client = httpx.AsyncClient(timeout=self.TIMEOUT)
+        """Context manager: crear cliente async"""
+        self.async_client = httpx.AsyncClient(timeout=30.0)
+        logger.debug("[ASYNC] Cliente HTTP async creado")
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Cierra el cliente HTTP async."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        """Context manager: cerrar cliente async"""
+        if self.async_client:
+            await self.async_client.aclose()
+            self.async_client = None
+        logger.debug("[ASYNC] Cliente HTTP async cerrado")
     
     def _get_client(self) -> httpx.AsyncClient:
-        """Obtiene o crea cliente HTTP async."""
-        if not self._client:
-            self._client = httpx.AsyncClient(timeout=self.TIMEOUT)
-        return self._client
+        """Obtiene el cliente async, lanzando error si no está inicializado"""
+        if not self.async_client:
+            raise RuntimeError(
+                "Cliente HTTP no inicializado. "
+                "Usar: async with MigoAPIServiceAsync() as service:"
+            )
+        return self.async_client
     
-    async def close(self):
-        """Cierra el cliente HTTP si está abierto."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
-    
-    def _get_endpoint(self, endpoint_name: str) -> Optional[ApiEndpoint]:
-        """
-        Obtiene configuración del endpoint desde BD.
-        Nota: Django ORM es sincrónico, se usa directamente.
-        """
-        try:
-            return ApiEndpoint.objects.filter(
-                service=self.service,
-                name=endpoint_name
-            ).first()
-        except Exception as e:
-            logger.error(f"Error obteniendo endpoint {endpoint_name}: {e}")
-            return None
+    # ========================================================================
+    # MÉTODO CRÍTICO ASYNC: _make_request_async (Sobrescribe MigoAPIService)
+    # ========================================================================
     
     async def _make_request_async(
-        self,
-        endpoint_name: str,
-        data: Optional[Dict[str, Any]] = None,
+        self, 
+        endpoint_name: str, 
+        data: dict = None, 
         method: str = 'POST',
-        retry_count: int = 0
+        batch_request: ApiBatchRequest = None, 
+        retry_count: int = 0, 
+        max_retries: int = 2
     ) -> Dict[str, Any]:
         """
-        Realiza una petición HTTP async a APIMIGO.
+        Versión ASYNC de _make_request().
         
-        Args:
-            endpoint_name: Nombre del endpoint
-            data: Datos para la petición
-            method: Método HTTP (GET/POST)
-            retry_count: Número de reintentos actual
-            
-        Returns:
-            Dict con respuesta de la API
+        Reutiliza TODA la lógica de MigoAPIService excepto la llamada HTTP.
+        - Validación de rate limit (existente)
+        - Logging (existente)
+        - Reintentos (existente)
+        - Manejo de errores (existente)
+        
+        Solo cambia: usa httpx async en lugar de requests sync
         """
         start_time = timezone.now()
         endpoint = self._get_endpoint(endpoint_name)
@@ -154,6 +123,21 @@ class MigoAPIServiceAsync:
                 "error": f"Endpoint {endpoint_name} no configurado"
             }
         
+        # REUTILIZAR: Verificar rate limit (método heredado)
+        can_proceed, wait_time = self._check_rate_limit(endpoint_name)
+        if not can_proceed:
+            error_msg = f"Rate limit excedido para {endpoint_name}. Esperar {wait_time:.1f} segundos"
+            self._log_api_call(
+                endpoint_name=endpoint_name,
+                request_data=data,
+                response_data={},
+                status="RATE_LIMITED",
+                error_message=error_msg,
+                duration_ms=0,
+                batch_request=batch_request
+            )
+            return {"success": False, "error": error_msg}
+        
         # Preparar datos
         request_data = data or {}
         if 'token' not in request_data:
@@ -161,48 +145,56 @@ class MigoAPIServiceAsync:
         
         try:
             client = self._get_client()
-            url = f"{self.base_url}{endpoint.path}"
             
-            # Log de la petición
-            logger.debug(f"🚀 [ASYNC] {method} {url} (intento {retry_count + 1})")
-            
-            # Realizar petición
+            # CAMBIO ÚNICO: Usar httpx async en lugar de requests sync
             if method.upper() == 'POST':
                 response = await client.post(
-                    url,
+                    f"{self.base_url}{endpoint.path}",
                     json=request_data,
                     headers={'Content-Type': 'application/json'},
-                    timeout=endpoint.timeout or self.TIMEOUT
+                    timeout=endpoint.timeout or 30
                 )
             else:
                 response = await client.get(
-                    url,
+                    f"{self.base_url}{endpoint.path}",
                     params=request_data,
-                    timeout=endpoint.timeout or self.TIMEOUT
+                    timeout=endpoint.timeout or 30
                 )
             
             duration_ms = (timezone.now() - start_time).total_seconds() * 1000
             
-            # Procesar respuesta
+            # REUTILIZAR: Procesar respuesta (lógica existente)
             if response.status_code == 200:
                 response_data = response.json()
                 
-                logger.debug(f"✅ [ASYNC] Respuesta exitosa ({duration_ms:.1f}ms)")
+                if isinstance(response_data, dict):
+                    success = response_data.get('success', True)
+                    
+                    if not success and '404' in str(response_data.get('error', '')):
+                        response_data['invalid_sunat'] = True
                 
-                # Registrar en BD (asincronamente)
-                await self._log_api_call_async(
+                self._log_api_call(
                     endpoint_name=endpoint_name,
                     request_data=request_data,
                     response_data=response_data,
                     status="SUCCESS",
-                    duration_ms=int(duration_ms)
+                    duration_ms=duration_ms,
+                    batch_request=batch_request
                 )
                 
+                self._update_rate_limit(endpoint_name)
                 return response_data
             
-            elif response.status_code == 404 and endpoint_name == "consultar_ruc":
-                # RUC no encontrado
-                error_msg = "RUC no encontrado en SUNAT"
+            elif response.status_code == 404:
+                # REUTILIZAR: Manejo de RUC no encontrado (existente)
+                duration_ms = (timezone.now() - start_time).total_seconds() * 1000
+                
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error', 'RUC no encontrado en SUNAT')
+                except:
+                    error_msg = 'RUC no encontrado en SUNAT'
+                
                 response_data = {
                     "success": False,
                     "error": error_msg,
@@ -210,45 +202,37 @@ class MigoAPIServiceAsync:
                     "invalid_sunat": True
                 }
                 
-                logger.warning(f"⚠️  [ASYNC] RUC no encontrado (404)")
-                
-                # Marcar RUC como inválido (sincronamente, a través de cache_service)
+                # Extraer RUC y marcarlo como inválido
+                ruc = None
                 if data and 'ruc' in data:
                     ruc = data['ruc']
-                    try:
-                        self.cache_service.add_invalid_ruc(ruc, "404_NOT_FOUND")
-                        response_data['ruc'] = ruc
-                    except Exception as e:
-                        logger.warning(f"No se pudo marcar RUC {ruc} como inválido: {e}")
+                elif isinstance(request_data, dict) and 'ruc' in request_data:
+                    ruc = request_data['ruc']
                 
-                await self._log_api_call_async(
+                if ruc:
+                    self._mark_ruc_as_invalid(ruc, "404_NOT_FOUND")
+                    response_data['ruc'] = ruc
+                
+                self._log_api_call(
                     endpoint_name=endpoint_name,
                     request_data=request_data,
                     response_data=response_data,
                     status="RUC_INVALID",
                     error_message=error_msg,
-                    duration_ms=int(duration_ms)
+                    duration_ms=duration_ms,
+                    batch_request=batch_request
                 )
                 
+                self._update_rate_limit(endpoint_name)
                 return response_data
             
-            elif response.status_code >= 500 and retry_count < self.MAX_RETRIES:
-                # Error del servidor, reintentar
-                wait_seconds = self.RETRY_DELAY * (2 ** retry_count)  # Backoff exponencial
-                logger.warning(
-                    f"⚠️  [ASYNC] Error {response.status_code}. "
-                    f"Reintentando en {wait_seconds}s (intento {retry_count + 1})"
-                )
-                await asyncio.sleep(wait_seconds)
-                return await self._make_request_async(
-                    endpoint_name, data, method, retry_count + 1
-                )
-            
             else:
-                # Error HTTP
+                # REUTILIZAR: Manejo de otros errores HTTP (existente)
+                duration_ms = (timezone.now() - start_time).total_seconds() * 1000
+                
                 try:
                     error_data = response.json()
-                    error_msg = error_data.get('error', f'Error {response.status_code}')
+                    error_msg = f"Error {response.status_code}: {error_data.get('error', 'Error desconocido')}"
                 except:
                     error_msg = f"Error {response.status_code}: {response.text[:200]}"
                 
@@ -258,317 +242,372 @@ class MigoAPIServiceAsync:
                     "status_code": response.status_code
                 }
                 
-                logger.error(f"❌ [ASYNC] Error: {error_msg}")
-                
-                await self._log_api_call_async(
+                self._log_api_call(
                     endpoint_name=endpoint_name,
                     request_data=request_data,
                     response_data=response_data,
                     status="FAILED",
                     error_message=error_msg,
-                    duration_ms=int(duration_ms)
+                    duration_ms=duration_ms,
+                    batch_request=batch_request
                 )
                 
+                # Reintento para errores 5xx
+                if retry_count < max_retries and response.status_code >= 500:
+                    logger.warning(f"Reintentando {endpoint_name}, intento {retry_count + 1}/{max_retries}")
+                    await asyncio.sleep(2 ** retry_count)
+                    return await self._make_request_async(
+                        endpoint_name, data, method, 
+                        batch_request, retry_count + 1, max_retries
+                    )
+                
+                self._update_rate_limit(endpoint_name)
                 return response_data
         
-        except asyncio.TimeoutError:
-            error_msg = f"Timeout después de {self.TIMEOUT}s"
-            logger.error(f"❌ [ASYNC] {error_msg}")
-            return {"success": False, "error": error_msg}
-        
-        except httpx.RequestError as e:
-            error_msg = f"Error de conexión: {str(e)}"
-            logger.error(f"❌ [ASYNC] {error_msg}")
+        except (asyncio.TimeoutError, httpx.TimeoutException) as e:
+            # REUTILIZAR: Manejo de timeout (existente)
+            duration_ms = (timezone.now() - start_time).total_seconds() * 1000
+            error_msg = f"Timeout: {str(e)}"
             
-            # Reintentar en error de conexión
-            if retry_count < self.MAX_RETRIES:
-                wait_seconds = self.RETRY_DELAY * (2 ** retry_count)
-                logger.warning(f"⚠️  [ASYNC] Reintentando en {wait_seconds}s")
-                await asyncio.sleep(wait_seconds)
-                return await self._make_request_async(
-                    endpoint_name, data, method, retry_count + 1
-                )
+            response_data = {"success": False, "error": error_msg}
             
-            return {"success": False, "error": error_msg}
-        
-        except Exception as e:
-            error_msg = f"Error inesperado: {str(e)}"
-            logger.error(f"❌ [ASYNC] {error_msg}")
-            return {"success": False, "error": error_msg}
-    
-    async def _log_api_call_async(
-        self,
-        endpoint_name: str,
-        request_data: dict,
-        response_data: dict,
-        status: str,
-        error_message: str = "",
-        duration_ms: int = 0
-    ) -> None:
-        """
-        Registra llamada API en BD (ejecutada en thread pool para no bloquear).
-        
-        Args:
-            endpoint_name: Nombre del endpoint
-            request_data: Datos enviados
-            response_data: Respuesta recibida
-            status: Estado de la llamada
-            error_message: Mensaje de error si aplica
-            duration_ms: Duración en ms
-        """
-        try:
-            endpoint = self._get_endpoint(endpoint_name)
-            
-            # Ejecutar creación en thread pool (Django ORM es sincrónico)
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                None,
-                lambda: ApiCallLog.objects.create(
-                    service=self.service,
-                    endpoint=endpoint,
-                    status=status,
-                    request_data=request_data,
-                    response_data=response_data,
-                    response_code=response_data.get('status_code', 200) if isinstance(response_data, dict) else 200,
-                    error_message=error_message[:500],
-                    duration_ms=duration_ms,
-                    called_from="async_client"
-                )
+            self._log_api_call(
+                endpoint_name=endpoint_name,
+                request_data=request_data,
+                response_data=response_data,
+                status="FAILED",
+                error_message=error_msg,
+                duration_ms=duration_ms,
+                batch_request=batch_request
             )
+            
+            # Reintento para timeout
+            if retry_count < max_retries:
+                logger.warning(f"Reintentando {endpoint_name} por timeout, intento {retry_count + 1}/{max_retries}")
+                await asyncio.sleep(2 ** retry_count)
+                return await self._make_request_async(
+                    endpoint_name, data, method, 
+                    batch_request, retry_count + 1, max_retries
+                )
+            
+            return response_data
+        
         except Exception as e:
-            logger.error(f"Error registrando llamada API: {e}")
+            # REUTILIZAR: Manejo de error general (existente)
+            duration_ms = (timezone.now() - start_time).total_seconds() * 1000
+            error_msg = f"Error de conexión: {str(e)}"
+            
+            response_data = {"success": False, "error": error_msg}
+            
+            self._log_api_call(
+                endpoint_name=endpoint_name,
+                request_data=request_data,
+                response_data=response_data,
+                status="FAILED",
+                error_message=error_msg,
+                duration_ms=duration_ms,
+                batch_request=batch_request
+            )
+            
+            # Reintento
+            if retry_count < max_retries:
+                logger.warning(f"Reintentando {endpoint_name} por error, intento {retry_count + 1}/{max_retries}")
+                await asyncio.sleep(2 ** retry_count)
+                return await self._make_request_async(
+                    endpoint_name, data, method, 
+                    batch_request, retry_count + 1, max_retries
+                )
+            
+            return response_data
+    
+    # ========================================================================
+    # MÉTODOS ASYNC PRINCIPALES (Reutilizan lógica, pero async)
+    # ========================================================================
     
     async def consultar_ruc_async(
-        self,
-        ruc: str,
+        self, 
+        ruc: str, 
         force_refresh: bool = False,
         update_partner: bool = True
     ) -> Dict[str, Any]:
         """
-        Consulta individual de RUC de forma asincrónica.
+        Versión ASYNC de consultar_ruc().
         
-        Args:
-            ruc: Número de RUC a consultar
-            force_refresh: Ignorar cache y forzar consulta a API
-            update_partner: Actualizar estado del partner en BD
-            
-        Returns:
-            Dict con respuesta de la API
+        Reutiliza:
+        - Validación de formato (_validate_ruc_format)
+        - Cache de inválidos (_is_ruc_marked_invalid, _mark_ruc_as_invalid)
+        - Cache normal (cache_service)
+        - Actualización de partner (_update_partner_sunat_status)
+        
+        Solo cambia: usa _make_request_async()
         """
-        # Validar formato
-        if not ruc or len(str(ruc)) != 11 or not str(ruc).isdigit():
-            return {
+        start_time = timezone.now()
+        
+        # REUTILIZAR: Validar formato (método heredado)
+        is_valid_format, format_error = self._validate_ruc_format(ruc)
+        if not is_valid_format:
+            duration_ms = (timezone.now() - start_time).total_seconds() * 1000
+            api_response = {
                 "success": False,
-                "error": f"Formato de RUC inválido: {ruc}",
+                "error": format_error,
+                "ruc": ruc,
                 "invalid_format": True
             }
+            
+            self._log_api_call(
+                endpoint_name="consultar_ruc",
+                request_data={"ruc": ruc},
+                response_data=api_response,
+                status="INVALID_FORMAT",
+                error_message=format_error,
+                duration_ms=duration_ms
+            )
+            
+            if update_partner:
+                self._update_partner_sunat_status(ruc, api_response)
+            
+            return api_response
         
-        # Verificar cache de inválidos
-        if not force_refresh and self.cache_service.is_ruc_invalid(ruc):
-            logger.debug(f"[ASYNC] RUC {ruc} en cache de inválidos, omitiendo consulta")
-            return {
+        # REUTILIZAR: Verificar si está marcado como inválido (método heredado)
+        if not force_refresh and self._is_ruc_marked_invalid(ruc):
+            logger.debug(f"RUC {ruc} en cache de inválidos")
+            duration_ms = (timezone.now() - start_time).total_seconds() * 1000
+            
+            invalid_info = self.cache_service.get(self.INVALID_RUCS_CACHE_KEY, {}).get(ruc, {})
+            api_response = {
                 "success": False,
-                "error": "RUC marcado como inválido",
+                "error": f"RUC marcado como inválido: {invalid_info.get('reason', 'Desconocido')}",
                 "ruc": ruc,
                 "cache_hit": True
             }
+            
+            if update_partner:
+                self._update_partner_sunat_status(ruc, api_response)
+            
+            return api_response
         
-        # Verificar cache normal
+        # REUTILIZAR: Verificar cache normal (método heredado)
         if not force_refresh:
             cache_key = self.cache_service.get_service_cache_key('migo', f"ruc_{ruc}")
-            cached = self.cache_service.get(cache_key)
-            if cached:
-                logger.debug(f"[ASYNC] Cache hit para RUC {ruc}")
-                return {**cached, "cache_hit": True, "cache_type": "valid"}
+            cached_data = self.cache_service.get(cache_key)
+            if cached_data:
+                logger.debug(f"Cache hit para RUC {ruc}")
+                api_response = {**cached_data, "cache_hit": True}
+                
+                if update_partner:
+                    self._update_partner_sunat_status(ruc, api_response)
+                
+                return api_response
         
-        # Consultar API
-        result = await self._make_request_async(
-            "consultar_ruc",
-            data={"ruc": ruc}
-        )
+        # CAMBIO: Usar _make_request_async()
+        request_data = {"ruc": ruc}
+        api_response = await self._make_request_async("consultar_ruc", data=request_data)
         
-        # Cachear resultado si fue exitoso
-        if result.get("success"):
+        # REUTILIZAR: Procesar respuesta (lógica heredada)
+        if api_response.get("success"):
             cache_key = self.cache_service.get_service_cache_key('migo', f"ruc_{ruc}")
-            try:
-                self.cache_service.set(
-                    cache_key,
-                    result,
-                    ttl=self.cache_service.RUC_VALID_TTL
-                )
-            except Exception as e:
-                logger.warning(f"Error cacheando RUC {ruc}: {e}")
+            self.cache_service.set(cache_key, api_response, ttl=self.cache_service.RUC_VALID_TTL)
+            
+            if update_partner:
+                self._update_partner_sunat_status(ruc, api_response)
         
-        return result
+        elif api_response.get("invalid_sunat"):
+            if update_partner:
+                self._update_partner_sunat_status(ruc, api_response)
+        
+        return api_response
     
     async def consultar_ruc_masivo_async(
         self,
         rucs: List[str],
-        batch_size: int = 10,
+        batch_size: int = 50,
         update_partners: bool = True
     ) -> Dict[str, Any]:
         """
-        Consulta masiva de RUCs en paralelo de forma asincrónica.
+        Versión ASYNC de consultar_ruc_masivo().
         
-        Nota: Procesa en paralelo respetando rate limiting.
+        Reutiliza:
+        - Validación de formato
+        - Cache
+        - Procesamiento masivo
         
-        Args:
-            rucs: Lista de RUCs a consultar
-            batch_size: Número de consultas paralelas simultaneas
-            update_partners: Actualizar partners en BD
-            
-        Returns:
-            Dict con resultados consolidados
+        Solo cambia: procesa en paralelo con asyncio
         """
         if not rucs:
-            return {"success": False, "error": "Lista de RUCs vacía", "results": []}
+            return {
+                "success": False,
+                "error": "Lista de RUCs vacía",
+                "total": 0
+            }
         
-        # Filtrar duplicados
+        # Filtrar únicos
         rucs_unicos = list(set(rucs))
-        logger.info(f"[ASYNC] Consultando {len(rucs_unicos)} RUCs únicos (de {len(rucs)} originales)")
         
         resultados = {
             "success": True,
-            "total_rucs": len(rucs_unicos),
+            "total_rucs": len(rucs),
+            "unique_rucs": len(rucs_unicos),
+            "duplicates_removed": len(rucs) - len(rucs_unicos),
             "validos": [],
             "invalidos": [],
             "errores": [],
-            "started_at": datetime.now().isoformat(),
-            "completed_at": None,
-            "duration_ms": 0
+            "cache_hits": 0,
+            "api_calls": 0,
+            "batches_processed": 0
         }
         
-        start_time = datetime.now()
+        # Pre-filtrar por formato (REUTILIZAR validación)
+        rucs_a_procesar = []
+        for ruc in rucs_unicos:
+            is_valid_format, _ = self._validate_ruc_format(ruc)
+            if is_valid_format:
+                rucs_a_procesar.append(ruc)
+            else:
+                resultados["invalidos"].append({
+                    "ruc": ruc,
+                    "error": "Formato inválido",
+                    "type": "invalid"
+                })
         
-        try:
-            # Procesar en lotes paralelos
-            for i in range(0, len(rucs_unicos), batch_size):
-                batch = rucs_unicos[i:i + batch_size]
-                
-                # Crear tasks para todas las consultas del lote
-                tasks = [
-                    self.consultar_ruc_async(ruc, update_partner=update_partners)
-                    for ruc in batch
-                ]
-                
-                # Ejecutar en paralelo
-                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-                
-                # Procesar resultados del lote
-                for ruc, result in zip(batch, batch_results):
-                    if isinstance(result, Exception):
-                        resultados["errores"].append({
-                            "ruc": ruc,
-                            "error": str(result),
-                            "type": "exception"
-                        })
-                    elif result.get("success"):
-                        resultados["validos"].append({
-                            "ruc": ruc,
-                            "data": result
-                        })
-                    else:
-                        resultados["invalidos"].append({
-                            "ruc": ruc,
-                            "error": result.get("error", "Error desconocido"),
-                            "type": "api_error"
-                        })
-                
-                # Pequeña pausa entre lotes para respetar rate limiting
-                if i + batch_size < len(rucs_unicos):
-                    await asyncio.sleep(0.5)
+        # Procesar en lotes de forma PARALELA
+        for i in range(0, len(rucs_a_procesar), batch_size):
+            batch = rucs_a_procesar[i:i + batch_size]
+            resultados["batches_processed"] += 1
             
-            duration_ms = (datetime.now() - start_time).total_seconds() * 1000
-            resultados["completed_at"] = datetime.now().isoformat()
-            resultados["duration_ms"] = int(duration_ms)
+            logger.info(f"[ASYNC] Procesando lote {resultados['batches_processed']}: {len(batch)} RUCs")
             
-            logger.info(
-                f"[ASYNC] Consulta masiva completada: "
-                f"{len(resultados['validos'])} válidos, "
-                f"{len(resultados['invalidos'])} inválidos, "
-                f"{len(resultados['errores'])} errores "
-                f"en {duration_ms:.1f}ms"
-            )
+            # CAMBIO: Procesar en paralelo con asyncio
+            tasks = [
+                self.consultar_ruc_async(ruc, update_partner=update_partners)
+                for ruc in batch
+            ]
             
-            return resultados
+            responses = await asyncio.gather(*tasks)
+            
+            # Procesar respuestas
+            for ruc, response in zip(batch, responses):
+                if response.get("success"):
+                    resultados["validos"].append({
+                        "ruc": ruc,
+                        "data": response.get("data", {})
+                    })
+                elif response.get("invalid_sunat") or response.get("invalid_format"):
+                    resultados["invalidos"].append({
+                        "ruc": ruc,
+                        "error": response.get("error"),
+                        "type": "invalid"
+                    })
+                else:
+                    resultados["errores"].append({
+                        "ruc": ruc,
+                        "error": response.get("error"),
+                        "type": "error"
+                    })
+                
+                if response.get("cache_hit"):
+                    resultados["cache_hits"] += 1
+                else:
+                    resultados["api_calls"] += 1
+            
+            # Pequeña pausa entre lotes para respetar rate limiting
+            if i + batch_size < len(rucs_a_procesar):
+                await asyncio.sleep(0.5)
         
-        except Exception as e:
-            logger.error(f"[ASYNC] Error en consulta masiva: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "results": [],
-                "completed_at": datetime.now().isoformat(),
-                "duration_ms": int((datetime.now() - start_time).total_seconds() * 1000)
-            }
+        # Estadísticas
+        resultados["total_validos"] = len(resultados["validos"])
+        resultados["total_invalidos"] = len(resultados["invalidos"])
+        resultados["total_errores"] = len(resultados["errores"])
+        
+        logger.info(f"[ASYNC] Lote completado: {resultados['total_validos']} válidos, "
+                   f"{resultados['total_invalidos']} inválidos")
+        
+        return resultados
     
     async def consultar_dni_async(self, dni: str) -> Dict[str, Any]:
-        """Consulta un DNI de forma asincrónica."""
+        """
+        Versión ASYNC de consultar_dni().
+        Reutiliza validación y cache, solo cambia a async.
+        """
         cache_key = self.cache_service.get_service_cache_key('migo', f"dni_{dni}")
-        cached = self.cache_service.get(cache_key)
+        cached_data = self.cache_service.get(cache_key)
         
-        if cached:
-            return cached
+        if cached_data:
+            return {**cached_data, "cache_hit": True}
         
-        result = await self._make_request_async("consulta_dni", data={"dni": dni})
+        result = await self._make_request_async("consultar_dni", {"dni": dni})
         
         if result.get("success"):
-            try:
-                self.cache_service.set(
-                    cache_key,
-                    result,
-                    ttl=self.cache_service.RUC_INVALID_TTL
-                )
-            except Exception as e:
-                logger.warning(f"Error cacheando DNI {dni}: {e}")
+            self.cache_service.set(cache_key, result, ttl=self.cache_service.RUC_INVALID_TTL)
         
         return result
     
     async def consultar_tipo_cambio_async(self) -> Dict[str, Any]:
-        """Consulta tipo de cambio más reciente de forma asincrónica."""
-        return await self._make_request_async("tipo_cambio_latest", data={})
-
-
-# ============================================================================
-# FUNCIONES HELPER PARA USAR ASYNC EN CONTEXTO SINCRÓNICO
-# ============================================================================
-
-def run_async(coro):
-    """
-    Ejecuta una corutina en el event loop actual o crea uno nuevo.
+        """Versión ASYNC de consultar_tipo_cambio_latest()"""
+        return await self._make_request_async(
+            endpoint_name="tipo_cambio_latest",
+            data={}
+        )
     
-    Útil para llamar async desde código sincrónico.
-    
-    Ejemplo:
-        result = run_async(service.consultar_ruc_async('20100038146'))
-    """
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-    
-    if loop is None:
-        # No hay loop en ejecución, crear uno nuevo
-        return asyncio.run(coro)
-    else:
-        # Ya hay un loop, crear task
-        return asyncio.create_task(coro)
-
-
-async def batch_query(
-    service: MigoAPIServiceAsync,
-    rucs: List[str],
-    batch_size: int = 10
-) -> Dict[str, Any]:
-    """
-    Consulta un lote de RUCs en paralelo.
-    
-    Ejemplo:
-        async def main():
-            async with MigoAPIServiceAsync() as service:
-                results = await batch_query(service, ['20100038146', '20123456789'])
-                print(results)
+    async def validar_ruc_para_facturacion_async(self, ruc: str) -> Dict[str, Any]:
+        """
+        Versión ASYNC de validar_ruc_para_facturacion().
+        Reutiliza toda la lógica de validación.
+        """
+        try:
+            resultado = await self.consultar_ruc_async(ruc)
+            
+            if not resultado.get("success"):
+                return {
+                    "valido": False,
+                    "ruc": ruc,
+                    "razon_social": None,
+                    "estado": None,
+                    "condicion": None,
+                    "direccion": None,
+                    "errores": ["RUC no encontrado en SUNAT"],
+                    "advertencias": [],
+                }
+            
+            estado = resultado.get("estado_del_contribuyente", "").upper()
+            condicion = resultado.get("condicion_de_domicilio", "").upper()
+            
+            errores = []
+            advertencias = []
+            
+            # Validaciones críticas
+            if estado != "ACTIVO":
+                errores.append(f"Contribuyente no está ACTIVO (estado: {estado})")
+            
+            if condicion != "HABIDO":
+                errores.append(f"Contribuyente no es HABIDO (condición: {condicion})")
+            
+            # Validaciones de datos
+            razon_social = resultado.get("nombre_o_razon_social")
+            if not razon_social or len(razon_social.strip()) < 3:
+                advertencias.append("Razón social muy corta o vacía")
+            
+            direccion = resultado.get("direccion")
+            if not direccion or len(direccion.strip()) < 10:
+                advertencias.append("Dirección muy corta o incompleta")
+            
+            return {
+                "valido": len(errores) == 0,
+                "ruc": ruc,
+                "razon_social": razon_social,
+                "estado": estado,
+                "condicion": condicion,
+                "direccion": direccion,
+                "data_completa": resultado,
+                "errores": errores,
+                "advertencias": advertencias,
+            }
         
-        asyncio.run(main())
-    """
-    return await service.consultar_ruc_masivo_async(rucs, batch_size=batch_size)
+        except Exception as e:
+            logger.error(f"Error validando RUC {ruc}: {e}")
+            return {
+                "valido": False,
+                "ruc": ruc,
+                "razon_social": None,
+                "errores": [f"Error de validación: {str(e)}"],
+                "advertencias": [],
+            }

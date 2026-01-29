@@ -1,14 +1,11 @@
 import requests
 import time
-import hashlib
-import json
 from requests.exceptions import RequestException
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 
 from django.db import transaction
-from django.db.models import Q
 from django.conf import settings
 from django.utils import timezone
 
@@ -32,7 +29,7 @@ class MigoAPIService:
     Cliente específico para APIMIGO con todas sus funcionalidades.
     
     Características:
-    - Consultas de RUC, DNI, tipo de cambio
+    - Consultas de RUC, DNI, tipo de cambio, representantes legales
     - Cache integrado (LocMemCache en desarrollo, Memcached en producción)
     - Rate limiting automático
     - Manejo completo de errores
