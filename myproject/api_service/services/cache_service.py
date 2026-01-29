@@ -56,7 +56,7 @@ class APICacheService:
         
         cache_settings = settings.CACHES.get('default', {})
         backend = cache_settings.get('BACKEND', 'default')
-        print(f"Cache backend: {backend}")
+        logger.debug(f"Cache backend: {backend}")
         # Extraer nombre simple del backend
         if 'memcache' in backend.lower():
             return 'memcached'

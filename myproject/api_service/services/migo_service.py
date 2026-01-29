@@ -2,17 +2,14 @@ import requests
 import time
 import hashlib
 import json
-import requests
 from requests.exceptions import RequestException
 import logging
-from urllib import response
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 
 from django.db import transaction
 from django.db.models import Q
 from django.conf import settings
-from django.core.cache import cache
 from django.utils import timezone
 
 from .cache_service import APICacheService
@@ -564,43 +561,9 @@ class MigoAPIService:
         """Consulta información de la cuenta MIGO"""
         return self._make_request(
             endpoint_name="consulta_cuenta",
-            payload={},
+            data={},
             # endpoint_name_display="Consulta cuenta APIMIGO",
         )
-
-    # v1
-    def consultar_ruc(self, ruc) -> dict:
-        """Consulta individual de un RUC en SUNAT"""
-        cache_key = f"ruc_{ruc}"
-
-        # 1. Verificar cache primero
-        cached_data = self.cache_service.get(cache_key)
-        if cached_data:
-            return {**cached_data, "cache_hit": True}
-
-        # 2. Hacer consulta si no está en cache
-        try:
-            result = self._make_request("consulta_ruc", {"ruc": ruc})
-
-            # Cachear por 24 horas si se encuentra
-            if result.get("success"):
-                cache.set(cache_key, result, 86400)
-                return result.json()
-            elif response.status_code == 404:
-                # Manejar RUC no encontrado
-                return {
-                    "success": False,
-                    "error": "RUC no encontrado",
-                    "status_code": 404,
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": f"Error {response.status_code}",
-                    "status_code": response.status_code,
-                }
-        except requests.exceptions.RequestException as e:
-            return {"success": False, "error": str(e)}
 
     def consultar_ruc(self, ruc: str, force_refresh: bool = False, 
                      update_partner: bool = True) -> Dict[str, Any]:
@@ -609,8 +572,12 @@ class MigoAPIService:
         FUNCIÓN EXISTENTE: Mejorada con validación y cache de inválidos.
         
         Args:
-            ruc: Número de RUC a consultar
-            force_refresh: Ignorar cache y forzar consulta a API
+        # Delegate to APICacheService to keep logic centralized
+        try:
+            return self.cache_service.is_ruc_invalid(ruc)
+        except Exception as e:
+            logger.error(f"Error delegating is_ruc_invalid for {ruc}: {e}")
+            return False
             update_partner: Actualizar estado del partner en base de datos
             
         Returns:
@@ -673,7 +640,7 @@ class MigoAPIService:
         
         # 3. Verificar cache normal (para RUCs válidos)
         if not force_refresh:
-            cache_key = f"ruc_{ruc}"
+            cache_key = self.cache_service.get_service_cache_key('migo', f"ruc_{ruc}")
             cached_data = self.cache_service.get(cache_key)
             if cached_data:
                 logger.debug(f"Cache hit para RUC {ruc} (válido)")
@@ -691,9 +658,9 @@ class MigoAPIService:
         
         # 5. Procesar respuesta
         if api_response.get("success"):
-            # RUC válido - guardar en cache normal
-            cache_key = f"ruc_{ruc}"
-            self.cache_service.set(cache_key, api_response, ttl=3600)
+            # RUC válido - guardar en cache normal (use service-scoped key)
+            cache_key = self.cache_service.get_service_cache_key('migo', f"ruc_{ruc}")
+            self.cache_service.set(cache_key, api_response, ttl=self.cache_service.RUC_VALID_TTL)
             
             # Actualizar partner
             if update_partner:
@@ -708,17 +675,20 @@ class MigoAPIService:
     
     def consultar_dni(self, dni):
         """Consulta datos de un DNI"""
-        cache_key = f"migo_dni_{dni}"
-        cached_data = cache.get(cache_key)
+        cache_key = self.cache_service.get_service_cache_key('migo', f"dni_{dni}")
+        cached_data = self.cache_service.get(cache_key)
 
         if cached_data:
             return cached_data
 
         result = self._make_request("consulta_dni", {"dni": dni})
 
-        # Cachear por 24 horas
+        # Cachear por 24 horas (usar RUC_INVALID_TTL como TTL diario)
         if result.get("success"):
-            cache.set(cache_key, result, 86400)
+            try:
+                self.cache_service.set(cache_key, result, ttl=self.cache_service.RUC_INVALID_TTL)
+            except Exception:
+                logger.exception("Error cacheando resultado de DNI")
 
         return result
 
@@ -837,7 +807,7 @@ class MigoAPIService:
             }
 
         except Exception as e:
-            print(f"Error validando RUC {ruc}: {e}")
+            logger.error(f"Error validando RUC {ruc}: {e}")
             return {
                 "valido": False,
                 "ruc": ruc,
@@ -1471,8 +1441,8 @@ class MigoAPIService:
                                     self._update_partner_sunat_status(ruc, {"success": True, "data": item})
                                 
                                 # Marcar como válido removiendo del cache de inválidos si existe
-                                if self._is_ruc_marked_invalid(ruc):
-                                    self.clear_invalid_rucs_cache(ruc)
+                                if self.cache_service.is_ruc_invalid(ruc):
+                                    self.cache_service.remove_invalid_ruc(ruc)
                             else:
                                 # RUC no encontrado o error en SUNAT
                                 resultados["invalidos"].append({
@@ -1557,7 +1527,7 @@ class MigoAPIService:
                 continue
             
             # Verificar cache normal
-            cache_key = f"ruc_{ruc}"
+            cache_key = self.cache_service.get_service_cache_key('migo', f"ruc_{ruc}")
             cached_data = self.cache_service.get(cache_key)
             if cached_data:
                 resultados["cache_hits"] += 1
@@ -1601,20 +1571,24 @@ class MigoAPIService:
         Returns:
             Dict con información de RUCs inválidos
         """
-        invalid_rucs = self.cache_service.get(self.INVALID_RUCS_CACHE_KEY, {})
-        
-        return {
-            "total_invalidos": len(invalid_rucs),
-            "invalid_rucs": [
-                {
-                    "ruc": ruc,
-                    "reason": data.get("reason"),
-                    "timestamp": data.get("timestamp"),
-                    "ttl_hours": data.get("ttl_hours")
-                }
-                for ruc, data in invalid_rucs.items()
-            ]
-        }
+        # Delegate to APICacheService for the authoritative list
+        try:
+            invalid_rucs = self.cache_service.get_all_invalid_rucs()
+            return {
+                "total_invalidos": len(invalid_rucs),
+                "invalid_rucs": [
+                    {
+                        "ruc": ruc,
+                        "reason": data.get("reason"),
+                        "timestamp": data.get("added_at") or data.get("timestamp"),
+                        "ttl_hours": data.get("ttl_hours")
+                    }
+                    for ruc, data in invalid_rucs.items()
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Error obteniendo reporte de RUCs inválidos: {e}")
+            return {"total_invalidos": 0, "invalid_rucs": []}
     
     def clear_invalid_rucs_cache(self, ruc: str = None) -> Dict[str, Any]:
         """
@@ -1627,20 +1601,16 @@ class MigoAPIService:
         Returns:
             Dict con resultado de la operación
         """
-        if ruc:
-            invalid_rucs = self.cache_service.get(self.INVALID_RUCS_CACHE_KEY, {})
-            if ruc in invalid_rucs:
-                del invalid_rucs[ruc]
-                self.cache_service.set(
-                    self.INVALID_RUCS_CACHE_KEY, 
-                    invalid_rucs, 
-                    ttl=self.INVALID_RUC_TTL_HOURS * 3600
-                )
-                logger.info(f"RUC {ruc} removido del cache de inválidos")
-                return {"success": True, "message": f"RUC {ruc} removido del cache"}
+        try:
+            if ruc:
+                removed = self.cache_service.remove_invalid_ruc(ruc)
+                if removed:
+                    return {"success": True, "message": f"RUC {ruc} removido del cache"}
+                else:
+                    return {"success": False, "message": f"RUC {ruc} no encontrado en cache"}
             else:
-                return {"success": False, "message": f"RUC {ruc} no encontrado en cache"}
-        else:
-            self.cache_service.delete(self.INVALID_RUCS_CACHE_KEY)
-            logger.info("Cache de RUCs inválidos limpiado completamente")
-            return {"success": True, "message": "Cache de RUCs inválidos limpiado"}    
+                cleared = self.cache_service.clear_invalid_rucs()
+                return {"success": True, "message": "Cache de RUCs inválidos limpiado"} if cleared else {"success": False, "message": "No se pudo limpiar el cache de inválidos"}
+        except Exception as e:
+            logger.error(f"Error limpiando cache de RUCs inválidos: {e}")
+            return {"success": False, "message": str(e)}
