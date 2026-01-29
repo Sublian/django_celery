@@ -681,7 +681,7 @@ class MigoAPIService:
         if cached_data:
             return cached_data
 
-        result = self._make_request("consulta_dni", {"dni": dni})
+        result = self._make_request("consultar_dni", {"dni": dni})
 
         # Cachear por 24 horas (usar RUC_INVALID_TTL como TTL diario)
         if result.get("success"):

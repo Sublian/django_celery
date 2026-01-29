@@ -255,7 +255,7 @@ def test_migo_consultar_dni(migo_service):
     print("="*70)
     
     # DNI de prueba (modificar con uno real si es necesario)
-    dni = '12345678'
+    dni = '71265310'
     
     print(f"  📋 Consultando DNI: {dni}")
     print("  " + "-"*60)
@@ -304,8 +304,9 @@ def test_migo_tipo_cambio_latest(migo_service):
     print(f"    - Success: {result.get('success', 'N/A')}")
     if result.get('success'):
         print(f"    - Fecha: {result.get('fecha', 'N/A')}")
-        print(f"    - Tipo de cambio: {result.get('tipo_cambio', 'N/A')}")
-        print(f"    - Fuente: {result.get('fuente', 'N/A')}")
+        print(f"    - Moneda: {result.get('moneda', 'N/A')}")
+        print(f"    - Tipo de cambio Venta: {result.get('precio_venta', 'N/A')}")
+        print(f"    - Tipo de cambio Compra: {result.get('precio_compra', 'N/A')}")
     else:
         print(f"    - Error: {result.get('error', 'N/A')}")
     
@@ -340,7 +341,9 @@ def test_migo_tipo_cambio_fecha(migo_service):
     print(f"    - Success: {result.get('success', 'N/A')}")
     if result.get('success'):
         print(f"    - Fecha: {result.get('fecha', 'N/A')}")
-        print(f"    - Tipo de cambio: {result.get('tipo_cambio', 'N/A')}")
+        print(f"    - Moneda: {result.get('moneda', 'N/A')}")
+        print(f"    - Tipo de cambio Venta: {result.get('precio_venta', 'N/A')}")
+        print(f"    - Tipo de cambio Compra: {result.get('precio_compra', 'N/A')}")
     else:
         print(f"    - Error: {result.get('error', 'N/A')}")
     
