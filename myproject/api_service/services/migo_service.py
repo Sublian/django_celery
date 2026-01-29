@@ -565,7 +565,7 @@ class MigoAPIService:
         return self._make_request(
             endpoint_name="consulta_cuenta",
             payload={},
-            endpoint_name_display="Consulta cuenta APIMIGO",
+            # endpoint_name_display="Consulta cuenta APIMIGO",
         )
 
     # v1
@@ -731,8 +731,8 @@ class MigoAPIService:
         """
         return self._make_request(
             endpoint_name="tipo_cambio_latest",
-            payload={"token": self.token},
-            endpoint_name_display="Consulta tipo cambio más reciente",
+            data={},
+            # endpoint_name_display="Consulta tipo cambio más reciente",
         )
 
     def consultar_tipo_cambio_fecha(self, fecha):
@@ -746,8 +746,8 @@ class MigoAPIService:
         """
         return self._make_request(
             endpoint_name="tipo_cambio_fecha",
-            payload={"token": self.token, "fecha": fecha},
-            endpoint_name_display=f"Consulta tipo cambio fecha {fecha}",
+            data={"fecha": fecha},
+            # endpoint_name_display=f"Consulta tipo cambio fecha {fecha}",
         )
 
     def consultar_tipo_cambio_rango(self, fecha_inicio, fecha_fin):
@@ -762,12 +762,11 @@ class MigoAPIService:
         """
         return self._make_request(
             endpoint_name="tipo_cambio_rango",
-            payload={
-                "token": self.token,
+            data={
                 "fecha_inicio": fecha_inicio,
                 "fecha_fin": fecha_fin,
             },
-            endpoint_name_display=f"Consulta tipo cambio rango {fecha_inicio} a {fecha_fin}",
+            # endpoint_name_display=f"Consulta tipo cambio rango {fecha_inicio} a {fecha_fin}",
         )
 
     def consultar_representantes_legales(self, ruc):
@@ -781,8 +780,8 @@ class MigoAPIService:
         """
         return self._make_request(
             endpoint_name="representantes_legales",
-            payload={"token": self.token, "ruc": ruc},
-            endpoint_name_display="Consulta representantes legales",
+            data={},
+            # endpoint_name_display="Consulta representantes legales",
         )
 
     def validar_ruc_para_facturacion(self, ruc):
