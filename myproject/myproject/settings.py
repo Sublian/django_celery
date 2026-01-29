@@ -219,3 +219,18 @@ LOGGING = {
         },
     },
 }
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        # 'LOCATION': '127.0.0.1:11211',  # Puerto default de Memcached
+        'LOCATION': 'unique-snowflake',
+        'TIMEOUT': 3600,  # 1 hora por defecto
+        # 'OPTIONS': {
+        #     'no_delay': True,
+        #     'ignore_exc': True,
+        #     'max_pool_size': 4,
+        #     'use_pooling': True,
+        # }
+    }
+}

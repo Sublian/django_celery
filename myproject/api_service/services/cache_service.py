@@ -3,32 +3,156 @@ from datetime import datetime, timedelta
 import logging
 from typing import Any, Optional, Dict, List, Union
 
+from django.conf import settings
+
 logger = logging.getLogger(__name__)
 
 class APICacheService:
     """
-    Servicio de cache para API con soporte para RUCs inválidos.
+    Servicio centralizado de cache para APIs externas.
     
-    Mantiene todas las funciones existentes y agrega manejo específico
-    para RUCs inválidos basado en las mejoras de migo_service.py.
+    Características:
+    - Backend: LocMemCache (Desarrollo) | Memcached/Redis (Producción)
+    - Soporte para RUCs válidos e inválidos
+    - Manejo de tipo de cambio
+    - Rate limiting tracking
+    - Estadísticas y monitoreo
+    - TTL automático por tipo de dato
+    - Compatibilidad con múltiples servicios (Migo, NubeFact, etc.)
+    
+    NOTA: En desarrollo usamos LocMemCache (en memoria, sin dependencias externas)
+          Para producción, cambiar a Memcached o Redis en settings.py
     """
     
-    # Timeouts por defecto (manteniendo valores existentes)
-    DEFAULT_TTL = 900  # 15 minutos (900 segundos)
+    # Timeouts por defecto (en segundos)
+    DEFAULT_TTL = 900  # 15 minutos
     RUC_VALID_TTL = 3600  # 1 hora para RUCs válidos
     RUC_INVALID_TTL = 86400  # 24 horas para RUCs inválidos
+    RATE_LIMIT_TTL = 60  # 1 minuto para tracking de rate limit
     
     # Claves de cache específicas
-    TC_PREFIX = "tc_"  # Tipo de cambio (existente)
+    CACHE_KEY_INVALID_RUCS = 'invalid_rucs'
+    CACHE_KEY_RUC_DATA = 'ruc_data_{ruc}'
+    CACHE_KEY_API_RATE_LIMIT = 'api_rate_limit_{service}_{endpoint}'
+    CACHE_KEY_BATCH_RESULTS = 'batch_results_{batch_id}'
+    
+    # Prefijos para diferentes tipos de datos
+    TC_PREFIX = "tc_"  # Tipo de cambio
     RUC_PREFIX = "ruc_"  # RUCs válidos
-    INVALID_RUCS_KEY = "migo_invalid_rucs"  # RUCs inválidos (coordinado con migo_service)
+    INVALID_RUCS_KEY = "migo_invalid_rucs"  # RUCs inválidos
     
     def __init__(self):
-        """Inicializa el servicio de cache."""
+        """
+        Inicializa el servicio de cache.
+        Verifica la conexión a Memcached durante la inicialización.
+        """
         logger.debug("APICacheService inicializado")
+        self.cache = cache
+        self.backend = self._get_cache_backend()
+        self._verify_cache_connection()
+    
+    def _get_cache_backend(self) -> str:
+        """Obtiene el nombre del backend de cache configurado"""
+        
+        cache_settings = settings.CACHES.get('default', {})
+        backend = cache_settings.get('BACKEND', 'default')
+        print(f"Cache backend: {backend}")
+        # Extraer nombre simple del backend
+        if 'memcache' in backend.lower():
+            return 'memcached'
+        elif 'locmem' in backend.lower():
+            return 'local_memory'
+        elif 'redis' in backend.lower():
+            return 'redis'
+        else:
+            return 'unknown'
+    
+    def _verify_cache_connection(self) -> bool:
+        """
+        Verifica la conexión al servicio de cache (LocMemCache o Memcached).
+        
+        Esta verificación es crítica para asegurar que el cache está disponible.
+        Si falla, se registra un warning pero el servicio continúa funcionando
+        (fallback a comportamiento sin cache).
+        
+        Returns:
+            bool: True si la conexión es exitosa, False en caso contrario
+        """
+        try:
+            test_key = '__cache_connection_test__'
+            test_value = {'timestamp': datetime.now().isoformat(), 'status': 'ok'}
+            
+            # Intentar escribir en cache
+            # Nota: set() puede retornar None en algunos backends (LocMemCache, Memcached)
+            # Lo importante es que no lance excepción
+            try:
+                self.cache.set(test_key, test_value, 10)
+            except Exception as set_error:
+                logger.warning(f"⚠️  Cache.set() falló: {set_error}")
+                return False
+            
+            # Intentar leer del cache
+            try:
+                get_result = self.cache.get(test_key)
+            except Exception as get_error:
+                logger.warning(f"⚠️  Cache.get() falló: {get_error}")
+                return False
+            
+            # Verificar que obtuvimos lo que guardamos
+            if get_result != test_value:
+                logger.warning(
+                    f"⚠️  Verificación de cache falló. Esperado: {test_value}, "
+                    f"Obtenido: {get_result}"
+                )
+                return False
+            
+            # Limpiar clave de prueba
+            try:
+                self.cache.delete(test_key)
+            except Exception:
+                pass  # Ignorar errores en limpieza
+            
+            logger.info(
+                f"✅ Conexión a cache exitosa (backend: {self.backend})"
+            )
+            return True
+                
+        except Exception as e:
+            logger.error(
+                f"❌ Error verificando conexión al cache ({self.backend}): {str(e)}\n"
+                f"   El cache puede no estar disponible. Verifica que LocMemCache/Memcached está corriendo."
+            )
+            return False
+        
+    # ============================================================================
+    # MÉTODOS INTERNOS (HELPERS)
+    # ============================================================================
+    
+    def _normalize_key(self, key: str) -> str:
+        """
+        Normaliza una clave para asegurar compatibilidad con backends de cache.
+        Algunos backends (Memcached) tienen restricciones: sin espacios, max 250 caracteres.
+        
+        Args:
+            key: Clave original
+            
+        Returns:
+            str: Clave normalizada
+        """
+        # Reemplazar espacios con guiones bajos
+        normalized = key.replace(' ', '_').replace(':', '_')
+        
+        # Limitar a 250 caracteres (límite conservador para compatibilidad con Memcached)
+        if len(normalized) > 250:
+            # Crear hash de la parte que se trunca
+            import hashlib
+            hash_suffix = hashlib.md5(normalized.encode()).hexdigest()[:8]
+            normalized = normalized[:242] + '_' + hash_suffix
+        
+        return normalized
     
     # ============================================================================
-    # MÉTODOS BÁSICOS DE CACHE (EXISTENTES - MANTENIDOS SIN CAMBIOS)
+    # MÉTODOS BÁSICOS DE CACHE (EXISTENTES - MEJORADOS)
     # ============================================================================
     
     def get(self, key: str, default: Any = None) -> Any:
@@ -37,18 +161,31 @@ class APICacheService:
         
         Args:
             key: Clave del cache
-            default: Valor por defecto si no existe
+            default: Valor por defecto si no existe o hay error
             
         Returns:
             Valor almacenado o default
+            
+        Example:
+            >>> cache_service.get('ruc_20100038146')
+            {'ruc': '20100038146', 'nombre_o_razon_social': 'CONTINENTAL S.A.C.', ...}
         """
         try:
-            value = cache.get(key)
+            # Normalizar clave
+            normalized_key = self._normalize_key(key)
+            
+            # Obtener del cache
+            value = cache.get(normalized_key)
+            
             if value is None:
+                logger.debug(f"Cache MISS: {key}")
                 return default
+            
+            logger.debug(f"Cache HIT: {key}")
             return value
+            
         except Exception as e:
-            logger.error(f"Error obteniendo clave {key} del cache: {str(e)}")
+            logger.error(f"Error obteniendo clave '{key}' del cache: {str(e)}")
             return default
     
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
@@ -62,19 +199,36 @@ class APICacheService:
             
         Returns:
             True si se guardó exitosamente, False en caso de error
+            
+        Example:
+            >>> cache_service.set('ruc_20100038146', ruc_data, ttl=3600)
+            True
         """
         try:
-            timeout = ttl if ttl is not None else self.DEFAULT_TTL
-            result = cache.set(key, value, timeout)
+            # Normalizar clave
+            normalized_key = self._normalize_key(key)
             
-            # Debug logging
+            # Determinar timeout
+            timeout = ttl if ttl is not None else self.DEFAULT_TTL
+            
+            # Establecer en cache
+            # Nota: cache.set() puede retornar None en algunos backends
+            # Lo importante es que no lance excepción
+            self.cache.set(normalized_key, value, timeout)
+            
+            # Logging detallado en DEBUG
             if logger.isEnabledFor(logging.DEBUG):
                 value_size = len(str(value)) if value else 0
-                logger.debug(f"Cache SET: {key} (ttl: {timeout}s, size: {value_size})")
-                
-            return result
+                value_type = type(value).__name__
+                logger.debug(
+                    f"Cache SET: {key} (key_len: {len(normalized_key)}, "
+                    f"ttl: {timeout}s, size: {value_size}B, type: {value_type})"
+                )
+            
+            return True  # Siempre retorna True si no hay excepción
+            
         except Exception as e:
-            logger.error(f"Error estableciendo clave {key} en cache: {str(e)}")
+            logger.error(f"Error estableciendo clave '{key}' en cache: {str(e)}")
             return False
     
     def delete(self, key: str) -> bool:
@@ -86,29 +240,107 @@ class APICacheService:
             
         Returns:
             True si se eliminó exitosamente, False en caso de error
+            
+        Example:
+            >>> cache_service.delete('ruc_20100038146')
+            True
         """
         try:
-            result = cache.delete(key)
+            # Normalizar clave
+            normalized_key = self._normalize_key(key)
+            
+            # Eliminar del cache
+            result = cache.delete(normalized_key)
+            
             logger.debug(f"Cache DELETE: {key}")
-            return result
+            return result if result is not None else True
+            
         except Exception as e:
-            logger.error(f"Error eliminando clave {key} del cache: {str(e)}")
+            logger.error(f"Error eliminando clave '{key}' del cache: {str(e)}")
             return False
     
     def clear(self) -> bool:
         """
         Limpia todo el cache.
         
+        ⚠️  CUIDADO: Esta operación limpia TODO el cache de Memcached,
+        no solo las claves de este servicio.
+        
         Returns:
             True si se limpió exitosamente, False en caso de error
         """
         try:
             result = cache.clear()
-            logger.info("Cache limpiado completamente")
-            return result
+            logger.warning("⚠️  Cache limpiado completamente (todas las claves)")
+            return result if result is not None else True
+            
         except Exception as e:
             logger.error(f"Error limpiando cache: {str(e)}")
             return False
+    
+    # ============================================================================
+    # MÉTODOS PARA MANEJO MULTI-SERVICIO (NUEVOS - PARA FUTURO CRECIMIENTO)
+    # ============================================================================
+    
+    def get_service_cache_key(self, service_name: str, key: str) -> str:
+        """
+        Genera una clave de cache namespaceada por servicio.
+        
+        Útil para cuando se agreguen más servicios de API (NubeFact, SUNAT, etc.)
+        Evita colisiones entre servicios.
+        
+        Args:
+            service_name: Nombre del servicio (ej: 'migo', 'nubefact', 'sunat')
+            key: Clave específica del servicio
+            
+        Returns:
+            str: Clave namespaceada (ej: 'migo:ruc_20100038146')
+            
+        Example:
+            >>> cache_service.get_service_cache_key('migo', 'ruc_20100038146')
+            'migo:ruc_20100038146'
+        """
+        return f"{service_name.lower()}:{key}"
+    
+    def clear_service_cache(self, service_name: str) -> Dict[str, int]:
+        """
+        Limpia todas las claves del cache de un servicio específico.
+        
+        Nota: Memcached no tiene soporte nativo para eliminar por patrón,
+        así que este método solo limpia claves conocidas.
+        
+        Args:
+            service_name: Nombre del servicio a limpiar
+            
+        Returns:
+            Dict con conteo de claves eliminadas por tipo
+        """
+        cleaned_count = {
+            "ruc_valid": 0,
+            "ruc_invalid": 0,
+            "tipo_cambio": 0,
+            "total": 0
+        }
+        
+        try:
+            service_prefix = self.get_service_cache_key(service_name, "")
+            
+            # Nota: Esta es una limitación conocida de Memcached.
+            # Para mejor manejo de limpiezas parciales, considerar:
+            # 1. Redis con SCAN y patrón de claves
+            # 2. Rastrear claves en DB separada
+            # 3. Usar namespaces/buckets explícitos
+            
+            logger.info(
+                f"Limpieza parcial de cache para servicio '{service_name}' "
+                f"es limitada con Memcached. Considerar usar Redis para mejor control."
+            )
+            
+            return cleaned_count
+            
+        except Exception as e:
+            logger.error(f"Error limpiando cache del servicio {service_name}: {str(e)}")
+            return cleaned_count
     
     # ============================================================================
     # MÉTODOS PARA TIPO DE CAMBIO (EXISTENTES - MANTENIDOS CON MEJORAS)
@@ -565,28 +797,46 @@ class APICacheService:
     
     def get_cache_stats(self) -> Dict[str, Any]:
         """
-        Obtiene estadísticas del cache.
-        NUEVO MÉTODO: Para monitoreo y debugging.
+        Obtiene estadísticas completas del servicio de cache.
         
         Returns:
-            Dict con estadísticas del cache
+            Dict con información detallada del estado del cache
+            
+        Example:
+            >>> stats = cache_service.get_cache_stats()
+            >>> print(f"RUCs inválidos: {stats['invalid_rucs_count']}")
+            RUCs inválidos: 5
         """
         try:
+            # Obtener información del cache
             invalid_rucs = self.get_all_invalid_rucs()
+            connection_ok = self._verify_cache_connection()
             
             stats = {
                 "timestamp": datetime.now().isoformat(),
-                "invalid_rucs_count": len(invalid_rucs),
-                "invalid_rucs_sample": list(invalid_rucs.keys())[:10] if invalid_rucs else [],
-                "timeouts": {
-                    "default": self.DEFAULT_TTL,
-                    "ruc_valid": self.RUC_VALID_TTL,
-                    "ruc_invalid": self.RUC_INVALID_TTL
+                "status": "healthy" if connection_ok else "warning",
+                "backend": self.backend,
+                
+                # Estadísticas de RUCs
+                "invalid_rucs": {
+                    "total_count": len(invalid_rucs),
+                    "sample": list(invalid_rucs.keys())[:10] if invalid_rucs else [],
+                    "breakdown_by_reason": self._breakdown_invalid_rucs_by_reason(invalid_rucs)
                 },
-                "cache_keys": {
-                    "tipo_cambio_prefix": self.TC_PREFIX,
-                    "ruc_prefix": self.RUC_PREFIX,
-                    "invalid_rucs_key": self.INVALID_RUCS_KEY
+                
+                # Configuración de timeouts
+                "timeouts": {
+                    "default": f"{self.DEFAULT_TTL}s ({self.DEFAULT_TTL//60}min)",
+                    "ruc_valid": f"{self.RUC_VALID_TTL}s ({self.RUC_VALID_TTL//60}min)",
+                    "ruc_invalid": f"{self.RUC_INVALID_TTL}s ({self.RUC_INVALID_TTL//3600}h)",
+                    "rate_limit": f"{self.RATE_LIMIT_TTL}s"
+                },
+                
+                # Prefijos de claves
+                "key_prefixes": {
+                    "tipo_cambio": self.TC_PREFIX,
+                    "ruc_valid": self.RUC_PREFIX,
+                    "invalid_rucs": self.INVALID_RUCS_KEY
                 }
             }
             
@@ -594,12 +844,34 @@ class APICacheService:
             
         except Exception as e:
             logger.error(f"Error obteniendo estadísticas del cache: {str(e)}")
-            return {"error": str(e), "timestamp": datetime.now().isoformat()}
+            return {
+                "error": str(e), 
+                "timestamp": datetime.now().isoformat(),
+                "status": "error"
+            }
+    
+    def _breakdown_invalid_rucs_by_reason(self, invalid_rucs: Dict) -> Dict[str, int]:
+        """
+        Agrupa RUCs inválidos por razón.
+        
+        Args:
+            invalid_rucs: Dict de RUCs inválidos
+            
+        Returns:
+            Dict con conteo de RUCs por razón
+        """
+        breakdown = {}
+        for ruc, info in invalid_rucs.items():
+            reason = info.get("reason", "DESCONOCIDA")
+            breakdown[reason] = breakdown.get(reason, 0) + 1
+        return breakdown
     
     def cleanup_expired(self) -> Dict[str, int]:
         """
         Limpia elementos expirados del cache.
-        NUEVO MÉTODO: Para mantenimiento periódico.
+        
+        En Memcached, la expiración es automática, pero este método
+        limpia referencias en metadata que puedan estar expiradas.
         
         Returns:
             Dict con conteo de elementos limpiados por tipo
@@ -611,16 +883,217 @@ class APICacheService:
         }
         
         try:
-            # Limpiar RUCs inválidos expirados (ya se hace en get_all_invalid_rucs)
+            # Refrescar RUCs inválidos (elimina los expirados automáticamente)
             current_invalid = self.get_all_invalid_rucs()
             cleaned["invalid_rucs"] = 0  # El cleanup ya ocurrió en get_all_invalid_rucs
             
-            # Nota: Para RUCs válidos y tipo de cambio, el cleanup ocurre
-            # al intentar acceder a ellos (en los métodos get)
-            
-            logger.info(f"Cleanup completado: {cleaned}")
+            logger.info(f"Cache cleanup completado: {cleaned}")
             return cleaned
             
         except Exception as e:
             logger.error(f"Error en cleanup de cache: {str(e)}")
             return cleaned
+    
+    def get_health(self) -> Dict[str, Any]:
+        """
+        Verifica la salud del servicio de cache.
+        
+        Realiza pruebas para determinar si el cache está funcionando correctamente.
+        
+        Returns:
+            Dict con estado de salud
+            
+        Example:
+            >>> health = cache_service.get_health()
+            >>> if health['status'] == 'healthy':
+            ...     print("Cache está OK")
+        """
+        health = {
+            "timestamp": datetime.now().isoformat(),
+            "status": "healthy",
+            "checks": {}
+        }
+        
+        try:
+            # Check 1: Conexión al backend
+            connection_ok = self._verify_cache_connection()
+            health["checks"]["connection"] = "✅ OK" if connection_ok else "❌ FAILED"
+            if not connection_ok:
+                health["status"] = "unhealthy"
+            
+            # Check 2: Operaciones básicas
+            try:
+                test_key = "__health_check_" + str(datetime.now().timestamp()).replace(".", "_") + "__"
+                test_value = {"health": "check", "timestamp": datetime.now().isoformat()}
+                
+                if self.set(test_key, test_value, 10):
+                    if self.get(test_key) == test_value:
+                        health["checks"]["basic_operations"] = "✅ OK"
+                        self.delete(test_key)
+                    else:
+                        health["checks"]["basic_operations"] = "❌ Value mismatch"
+                        health["status"] = "unhealthy"
+                else:
+                    health["checks"]["basic_operations"] = "❌ SET failed"
+                    health["status"] = "unhealthy"
+                    
+            except Exception as e:
+                health["checks"]["basic_operations"] = f"❌ {str(e)}"
+                health["status"] = "unhealthy"
+            
+            # Check 3: Información de RUCs inválidos
+            try:
+                invalid_count = len(self.get_all_invalid_rucs())
+                health["checks"]["invalid_rucs"] = f"✅ {invalid_count} RUCs"
+            except Exception as e:
+                health["checks"]["invalid_rucs"] = f"⚠️  {str(e)}"
+            
+            # Summary
+            all_ok = all(
+                "✅" in str(v) for v in health["checks"].values()
+            )
+            health["status"] = "healthy" if all_ok else "warning" if health["status"] != "unhealthy" else "unhealthy"
+            
+            return health
+            
+        except Exception as e:
+            logger.error(f"Error verificando salud del cache: {str(e)}")
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "status": "unhealthy",
+                "error": str(e)
+            }
+
+
+# ============================================================================
+# Documentación de configuración y uso
+# ============================================================================
+"""
+CONFIGURACIÓN DE CACHE
+=====================
+
+🔧 DESARROLLO (LocMemCache) - ACTUAL
+====================================
+
+No requiere instalación de dependencias externas. Configurado en settings.py:
+
+   CACHES = {
+       'default': {
+           'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+           'LOCATION': 'unique-snowflake',
+           'TIMEOUT': 3600,
+       }
+   }
+
+Ventajas:
+- Sin dependencias externas (memcached daemon)
+- Rápido para desarrollo local
+- Mismo código que producción
+- Funciona en Windows/WSL sin problemas de red
+
+Desventajas:
+- No persiste entre reinicios
+- No compartido entre procesos
+- NO usar en producción
+
+🚀 PRODUCCIÓN (Memcached o Redis) - FUTURO
+===========================================
+
+Para pasar a producción, cambiar settings.py a:
+
+OPCIÓN 1 - Memcached (Recomendado):
+   CACHES = {
+       'default': {
+           'BACKEND': 'django.core.cache.backends.memcached.PyMemcacheCache',
+           'LOCATION': '127.0.0.1:11211',  # O IP del servidor Memcached
+           'TIMEOUT': 3600,
+           'OPTIONS': {
+               'no_delay': True,
+               'ignore_exc': True,
+               'max_pool_size': 4,
+               'use_pooling': True,
+           }
+       }
+   }
+
+OPCIÓN 2 - Redis:
+   CACHES = {
+       'default': {
+           'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+           'LOCATION': 'redis://127.0.0.1:6379/1',
+       }
+   }
+
+USO EN SERVICIOS API
+====================
+
+# Inicializar
+from api_service.services.cache_service import APICacheService
+cache_service = APICacheService()
+
+# Almacenar RUC válido
+cache_service.set_ruc('20100038146', {
+    'nombre_o_razon_social': 'CONTINENTAL S.A.C.',
+    'estado_del_contribuyente': 'ACTIVO',
+    ...
+}, ttl=3600)
+
+# Obtener RUC
+ruc_data = cache_service.get_ruc('20100038146')
+
+# Marcar RUC como inválido
+cache_service.add_invalid_ruc('20999999999', reason='NO_EXISTE_SUNAT')
+
+# Verificar si RUC es inválido
+if cache_service.is_ruc_invalid('20999999999'):
+    print("RUC está en cache de inválidos")
+
+# Obtener estadísticas
+stats = cache_service.get_cache_stats()
+print(f"RUCs inválidos: {stats['invalid_rucs']['total_count']}")
+
+# Verificar salud del cache
+health = cache_service.get_health()
+print(f"Cache status: {health['status']}")
+
+LIMITACIONES POR BACKEND
+=========================
+
+📊 LocMemCache (Desarrollo Actual):
+   - No persiste entre reinicios
+   - No compartido entre procesos (Workers)
+   - Limitado por RAM disponible
+   - Perfecto para desarrollo local
+
+💾 Memcached (Producción):
+   - No soporta patrones de claves (SCAN/PATTERN)
+   - Tamaño máximo de valor: ~1MB
+   - Tamaño máximo de clave: 250 caracteres (respetamos este límite)
+   - No persiste datos entre reinicios
+   - TTL máximo: ~30 días
+
+🔴 Redis (Producción Avanzada):
+   - Soporte completo para patrones
+   - Persistencia opcional (RDB/AOF)
+   - Mejor rendimiento en operaciones complejas
+   - Requiere más configuración
+
+MONITOREO Y MANTENIMIENTO
+=========================
+
+# Ver datos del cache (en Python)
+>>> from api_service.services.cache_service import APICacheService
+>>> cache = APICacheService()
+>>> stats = cache.get_cache_stats()
+>>> print(f"RUCs inválidos: {stats['invalid_rucs']['total_count']}")
+
+# Verificar salud
+>>> health = cache.get_health()
+>>> print(health['status'])
+
+# Limpiar cache (afecta TODO el cache)
+>>> cache.clear()
+
+# Limpiar solo RUCs inválidos
+>>> cache.clear_invalid_rucs()
+"""

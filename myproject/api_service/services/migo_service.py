@@ -31,7 +31,19 @@ logger = logging.getLogger(__name__)
 
 
 class MigoAPIService:
-    """Cliente específico para APIMIGO con todas sus funcionalidades"""
+    """
+    Cliente específico para APIMIGO con todas sus funcionalidades.
+    
+    Características:
+    - Consultas de RUC, DNI, tipo de cambio
+    - Cache integrado (LocMemCache en desarrollo, Memcached en producción)
+    - Rate limiting automático
+    - Manejo completo de errores
+    - Batch processing
+    
+    El cache se gestiona automáticamente a través de APICacheService.
+    Los RUCs válidos se cachean por 1 hora, inválidos por 24 horas.
+    """
     
     # Constantes para cache de RUCs inválidos
     INVALID_RUCS_CACHE_KEY = "migo_invalid_rucs"
