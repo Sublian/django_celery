@@ -750,7 +750,7 @@ class MigoAPIService:
         """
         return self._make_request(
             endpoint_name="representantes_legales",
-            data={},
+            data={"ruc": ruc},
             # endpoint_name_display="Consulta representantes legales",
         )
 
