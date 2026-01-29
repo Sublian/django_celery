@@ -1,0 +1,50 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.13, pytest-9.0.2, pluggy-1.6.0 -- c:\Users\lagonzalez\Desktop\django_fx\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\lagonzalez\Desktop\django_fx
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-1.3.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 23 items
+
+api_service\services\test_migo_service_async.py::TestMigoAPIServiceAsyncInit::test_init_default_values PASSED [  4%]
+api_service\services\test_migo_service_async.py::TestMigoAPIServiceAsyncInit::test_init_custom_timeout PASSED [  8%]
+api_service\services\test_migo_service_async.py::TestMigoAPIServiceAsyncInit::test_context_manager_entry_exit PASSED [ 13%]
+api_service\services\test_migo_service_async.py::TestConsultarRucAsync::test_consultar_ruc_success PASSED [ 17%]
+api_service\services\test_migo_service_async.py::TestConsultarRucAsync::test_consultar_ruc_from_cache PASSED [ 21%]
+api_service\services\test_migo_service_async.py::TestConsultarRucAsync::test_consultar_ruc_retry_on_failure PASSED [ 26%]
+api_service\services\test_migo_service_async.py::TestConsultarRucAsync::test_consultar_ruc_invalid_format PASSED [ 30%]
+api_service\services\test_migo_service_async.py::TestConsultarRucMasivoAsync::test_consultar_ruc_masivo_parallel_execution PASSED [ 34%]
+api_service\services\test_migo_service_async.py::TestConsultarRucMasivoAsync::test_consultar_ruc_masivo_batch_processing PASSED [ 39%]
+api_service\services\test_migo_service_async.py::TestConsultarRucMasivoAsync::test_consultar_ruc_masivo_error_handling PASSED [ 43%]
+api_service\services\test_migo_service_async.py::TestConsultarDniAsync::test_consultar_dni_success PASSED [ 47%]
+api_service\services\test_migo_service_async.py::TestConsultarTipoCambioAsync::test_consultar_tipo_cambio_success PASSED [ 52%]
+api_service\services\test_migo_service_async.py::TestErrorHandling::test_timeout_error PASSED [ 56%]
+api_service\services\test_migo_service_async.py::TestErrorHandling::test_connection_error PASSED [ 60%]
+api_service\services\test_migo_service_async.py::TestCaching::test_cache_ttl_respected PASSED [ 65%]
+api_service\services\test_migo_service_async.py::TestCaching::test_invalid_ruc_cache PASSED [ 69%]
+api_service\services\test_migo_service_async.py::TestLogging::test_async_logging PASSED [ 73%]
+api_service\services\test_migo_service_async.py::TestRateLimiting::test_rate_limit_respected PASSED [ 78%]
+api_service\services\test_migo_service_async.py::TestHelperFunctions::test_run_async_function PASSED [ 82%]
+api_service\services\test_migo_service_async.py::TestHelperFunctions::test_batch_query_function PASSED [ 86%]
+api_service\services\test_migo_service_async.py::TestIntegration::test_consultar_ruc_real_api SKIPPED [ 91%]
+api_service\services\test_migo_service_async.py::TestIntegration::test_consultar_ruc_masivo_real_api SKIPPED [ 95%]
+api_service\services\test_migo_service_async.py::TestPerformance::test_parallel_vs_sequential PASSED [100%]
+
+============================== warnings summary ===============================
+api_service\services\test_migo_service_async.py:522
+  C:\Users\lagonzalez\Desktop\django_fx\myproject\api_service\services\test_migo_service_async.py:522: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+api_service\services\test_migo_service_async.py:564
+  C:\Users\lagonzalez\Desktop\django_fx\myproject\api_service\services\test_migo_service_async.py:564: PytestUnknownMarkWarning: Unknown pytest.mark.performance - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.performance
+
+myproject/api_service/services/test_migo_service_async.py::TestMigoAPIServiceAsyncInit::test_init_default_values
+  myproject\api_service\services\test_migo_service_async.py:51: PytestWarning: The test <Function test_init_default_values> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+
+myproject/api_service/services/test_migo_service_async.py::TestMigoAPIServiceAsyncInit::test_init_custom_timeout
+  myproject\api_service\services\test_migo_service_async.py:58: PytestWarning: The test <Function test_init_custom_timeout> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 21 passed, 2 skipped, 4 warnings in 10.94s ==================
