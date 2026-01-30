@@ -24,7 +24,7 @@ class NubefactService(BaseAPIService):
     
     Uso:
         with NubefactService() as service:
-            response = service.emitir_comprobante(datos)
+            response = service.generar_comprobante(datos)
     
     Attributes:
         ERROR_CODES (dict): Mapeo de códigos de error de Nubefact
@@ -305,12 +305,12 @@ class NubefactService(BaseAPIService):
             
             raise NubefactAPIError(f"Error inesperado en servicio Nubefact: {str(e)}")
     
-    def emitir_comprobante(self, datos_comprobante: dict) -> Dict[str, Any]:
+    def generar_comprobante(self, datos_comprobante: dict) -> Dict[str, Any]:
         """
         Emite un comprobante electrónico en Nubefact.
         
         Método simplificado que envuelve send_request para la operación
-        'emitir_comprobante'. Valida automáticamente los datos.
+        'generar_comprobante'. Valida automáticamente los datos.
         
         Args:
             datos_comprobante (dict): Diccionario con los datos del comprobante.
@@ -352,10 +352,10 @@ class NubefactService(BaseAPIService):
             ...     'items': [...]
             ... }
             >>> with NubefactService() as service:
-            ...     respuesta = service.emitir_comprobante(datos)
+            ...     respuesta = service.generar_comprobante(datos)
             ...     print(respuesta.get('enlace_comprobante'))
         """
-        return self.send_request("emitir_comprobante", datos_comprobante)
+        return self.send_request("generar_comprobante", datos_comprobante)
     
     def consultar_comprobante(self, tipo: int, serie: str, numero: int) -> Dict[str, Any]:
         """

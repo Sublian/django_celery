@@ -47,7 +47,7 @@ def api_service_mock():
 def api_endpoints_mock(api_service_mock):
     """Mocks de ApiEndpoint para los 3 endpoints."""
     endpoints = {
-        "emitir_comprobante": Mock(spec=ApiEndpoint),
+        "generar_comprobante": Mock(spec=ApiEndpoint),
         "consultar_comprobante": Mock(spec=ApiEndpoint),
         "anular_comprobante": Mock(spec=ApiEndpoint),
     }
@@ -175,10 +175,10 @@ class TestEndpointLoading:
     @patch('api_service.services.nubefact.base_service.ApiEndpoint.objects.filter')
     def test_get_endpoint_retorna_endpoint_valido(self, mock_filter, nubefact_service, api_endpoints_mock):
         """Verifica que _get_endpoint() retorna endpoint válido."""
-        endpoint = api_endpoints_mock['emitir_comprobante']
+        endpoint = api_endpoints_mock['generar_comprobante']
         mock_filter.return_value.first.return_value = endpoint
         
-        result = nubefact_service._get_endpoint('emitir_comprobante')
+        result = nubefact_service._get_endpoint('generar_comprobante')
         
         assert result == endpoint
         mock_filter.assert_called_once()
@@ -198,7 +198,7 @@ class TestEndpointLoading:
         mock_get_endpoint.return_value = None
         
         with pytest.raises(ValueError, match="no configurado"):
-            nubefact_service.send_request('emitir_comprobante', sample_invoice_data)
+            nubefact_service.send_request('generar_comprobante', sample_invoice_data)
 
 
 # ============================================================================
@@ -228,7 +228,7 @@ class TestRateLimiting:
                 with patch.object(NubefactService, '_update_rate_limit'):
                     with patch.object(NubefactService, '_log_api_call'):
                         data = {'operacion': 'generar_comprobante'}
-                        result = nubefact_service.send_request('emitir_comprobante', data)
+                        result = nubefact_service.send_request('generar_comprobante', data)
                         
                         assert result is not None
 
@@ -243,7 +243,7 @@ class TestRateLimiting:
             mock_get_ep.return_value = endpoint
             
             with pytest.raises(NubefactAPIError, match="Rate limit"):
-                nubefact_service.send_request('emitir_comprobante', sample_invoice_data)
+                nubefact_service.send_request('generar_comprobante', sample_invoice_data)
 
 
 # ============================================================================
@@ -254,13 +254,13 @@ class TestOperationMethods:
     """Tests de los métodos de operación (emitir, consultar, anular)."""
 
     @patch.object(NubefactService, 'send_request')
-    def test_emitir_comprobante_llama_send_request(self, mock_send, nubefact_service, sample_invoice_data):
-        """Verifica que emitir_comprobante() llama send_request() correctamente."""
+    def test_generar_comprobante_llama_send_request(self, mock_send, nubefact_service, sample_invoice_data):
+        """Verifica que generar_comprobante() llama send_request() correctamente."""
         mock_send.return_value = {'success': True, 'enlace': 'http://example.com/pdf'}
         
-        result = nubefact_service.emitir_comprobante(sample_invoice_data)
+        result = nubefact_service.generar_comprobante(sample_invoice_data)
         
-        mock_send.assert_called_once_with('emitir_comprobante', sample_invoice_data)
+        mock_send.assert_called_once_with('generar_comprobante', sample_invoice_data)
         assert result['success'] is True
 
     @patch.object(NubefactService, 'send_request')
@@ -350,7 +350,7 @@ class TestValidation:
                     
                     with patch.object(NubefactService, '_update_rate_limit'):
                         with patch.object(NubefactService, '_log_api_call'):
-                            nubefact_service.send_request('emitir_comprobante', sample_invoice_data)
+                            nubefact_service.send_request('generar_comprobante', sample_invoice_data)
                             
                             mock_validate.assert_called_once()
 
@@ -381,7 +381,7 @@ class TestErrorHandling:
             with patch.object(NubefactService, '_log_api_call'):
                 with patch('api_service.services.nubefact.nubefact_service.validate_json_structure'):
                     with pytest.raises(NubefactValidationError):
-                        nubefact_service.send_request('emitir_comprobante', sample_invoice_data)
+                        nubefact_service.send_request('generar_comprobante', sample_invoice_data)
 
     @patch.object(NubefactService, '_get_endpoint')
     @patch.object(NubefactService, '_check_rate_limit')
@@ -402,7 +402,7 @@ class TestErrorHandling:
             with patch.object(NubefactService, '_log_api_call'):
                 with patch('api_service.services.nubefact.nubefact_service.validate_json_structure'):
                     with pytest.raises(NubefactAPIError):
-                        nubefact_service.send_request('emitir_comprobante', sample_invoice_data)
+                        nubefact_service.send_request('generar_comprobante', sample_invoice_data)
 
     @patch.object(NubefactService, '_get_endpoint')
     @patch.object(NubefactService, '_check_rate_limit')
@@ -420,7 +420,7 @@ class TestErrorHandling:
             with patch.object(NubefactService, '_log_api_call'):
                 with patch('api_service.services.nubefact.nubefact_service.validate_json_structure'):
                     with pytest.raises(NubefactAPIError, match="Error de conexión"):
-                        nubefact_service.send_request('emitir_comprobante', sample_invoice_data)
+                        nubefact_service.send_request('generar_comprobante', sample_invoice_data)
 
     @patch.object(NubefactService, '_get_endpoint')
     @patch.object(NubefactService, '_check_rate_limit')
@@ -438,7 +438,7 @@ class TestErrorHandling:
             with patch.object(NubefactService, '_log_api_call'):
                 with patch('api_service.services.nubefact.nubefact_service.validate_json_structure'):
                     with pytest.raises(NubefactAPIError, match="Error de conexión"):
-                        nubefact_service.send_request('emitir_comprobante', sample_invoice_data)
+                        nubefact_service.send_request('generar_comprobante', sample_invoice_data)
 
 
 # ============================================================================
@@ -457,7 +457,7 @@ class TestLogging:
         endpoint = Mock()
         endpoint.path = "/api/v1/send"
         endpoint.timeout = 60
-        endpoint.name = 'emitir_comprobante'
+        endpoint.name = 'generar_comprobante'
         mock_get_ep.return_value = endpoint
         
         response_data = {
@@ -475,7 +475,7 @@ class TestLogging:
                 mock_validate.return_value = sample_invoice_data
                 
                 with patch.object(NubefactService, '_update_rate_limit'):
-                    nubefact_service.send_request('emitir_comprobante', sample_invoice_data)
+                    nubefact_service.send_request('generar_comprobante', sample_invoice_data)
                     
                     # Verificar que se llamó a ApiCallLog.objects.create
                     assert mock_create.called
@@ -491,7 +491,7 @@ class TestLogging:
         endpoint = Mock()
         endpoint.path = "/api/v1/send"
         endpoint.timeout = 60
-        endpoint.name = 'emitir_comprobante'
+        endpoint.name = 'generar_comprobante'
         mock_get_ep.return_value = endpoint
         
         with patch.object(nubefact_service.session, 'post') as mock_post:
@@ -504,7 +504,7 @@ class TestLogging:
                 mock_validate.return_value = sample_invoice_data
                 
                 with pytest.raises(NubefactAPIError):
-                    nubefact_service.send_request('emitir_comprobante', sample_invoice_data)
+                    nubefact_service.send_request('generar_comprobante', sample_invoice_data)
                     
                     # Verificar que se llamó a ApiCallLog.objects.create
                     assert mock_create.called
@@ -550,7 +550,7 @@ class TestBatchRequest:
         endpoint = Mock()
         endpoint.path = "/api/v1/send"
         endpoint.timeout = 60
-        endpoint.name = 'emitir_comprobante'
+        endpoint.name = 'generar_comprobante'
         mock_get_ep.return_value = endpoint
         
         batch_request = Mock(spec=ApiBatchRequest)
@@ -566,7 +566,7 @@ class TestBatchRequest:
                 mock_validate.return_value = sample_invoice_data
                 
                 with patch.object(NubefactService, '_update_rate_limit'):
-                    nubefact_service.send_request('emitir_comprobante', sample_invoice_data, batch_request=batch_request)
+                    nubefact_service.send_request('generar_comprobante', sample_invoice_data, batch_request=batch_request)
                     
                     # Verificar que batch_request se pasó a ApiCallLog
                     assert mock_create.called
@@ -585,14 +585,14 @@ class TestIntegration:
     @patch.object(NubefactService, '_check_rate_limit')
     @patch.object(NubefactService, '_update_rate_limit')
     @patch('api_service.services.nubefact.base_service.ApiCallLog.objects.create')
-    def test_flujo_completo_emitir_comprobante(self, mock_create, mock_update, mock_check, mock_get_ep, nubefact_service, sample_invoice_data):
+    def test_flujo_completo_generar_comprobante(self, mock_create, mock_update, mock_check, mock_get_ep, nubefact_service, sample_invoice_data):
         """Test de flujo completo: emitir comprobante."""
         # Setup
         mock_check.return_value = (True, 0)
         endpoint = Mock()
         endpoint.path = "/api/v1/send"
         endpoint.timeout = 60
-        endpoint.name = 'emitir_comprobante'
+        endpoint.name = 'generar_comprobante'
         mock_get_ep.return_value = endpoint
         
         response_data = {
@@ -611,7 +611,7 @@ class TestIntegration:
                 mock_validate.return_value = sample_invoice_data
                 
                 # Ejecutar
-                result = nubefact_service.emitir_comprobante(sample_invoice_data)
+                result = nubefact_service.generar_comprobante(sample_invoice_data)
                 
                 # Verificaciones
                 assert result['success'] is True
