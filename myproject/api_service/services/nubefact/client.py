@@ -22,8 +22,9 @@ class NubefactClient:
         self.config = config or NubefactConfig()
         self.session = requests.Session()
         # Configurar headers fijos para todas las peticiones
+        # Nota: Usar auth_token (nuevos atributos de config.py después del refactor)
         self.session.headers.update({
-            'Authorization': self.config.api_token,
+            'Authorization': self.config.auth_token,
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         })
@@ -58,7 +59,9 @@ class NubefactClient:
 
     def post(self, endpoint: str, data: dict) -> dict:
         """Envía una petición POST a un endpoint específico de Nubefact."""
-        url = f"{self.config.api_base_url}/{endpoint.lstrip('/')}"
+        # Nota: Usar base_url (nuevos atributos de config.py después del refactor)
+        # base_url ahora contiene solo la URL base, el endpoint debe incluir el path completo
+        url = f"{self.config.base_url}{endpoint}" if endpoint.startswith('/') else f"{self.config.base_url}/{endpoint}"
         try:
             response = self.session.post(url, json=data, timeout=30)  # Timeout de 30 segundos
             return self._handle_response(response)

@@ -22,12 +22,6 @@ class Item(BaseModel):
     anticipo_documento_numero: Optional[int] = Field(None, ge=1, le=99999999)
     codigo_producto_sunat: Optional[str] = Field(None, max_length=8)
 
-    @validator('fecha_de_emision', 'fecha_de_vencimiento', pre=True)
-    def parse_date(cls, v):
-        if isinstance(v, date):
-            return v.strftime('%d-%m-%Y')
-        return v
-
 class ComprobanteParaEnvio(BaseModel):
     """Modelo principal para la operación 'generar_comprobante'."""
     operacion: str = "generar_comprobante"
@@ -49,6 +43,13 @@ class ComprobanteParaEnvio(BaseModel):
     enviar_automaticamente_a_la_sunat: bool = True
     enviar_automaticamente_al_cliente: bool = False
     items: List[Item]
+    
+    @validator('fecha_de_emision', pre=True)
+    def parse_date(cls, v):
+        """Valida y convierte fecha al formato DD-MM-YYYY."""
+        if isinstance(v, date):
+            return v.strftime('%d-%m-%Y')
+        return v
 
     # Puedes agregar más campos opcionales aquí según necesites (descuento_global, guias, etc.)
     # Ejemplo: guias: Optional[List[Dict]] = None

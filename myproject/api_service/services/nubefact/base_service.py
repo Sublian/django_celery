@@ -3,9 +3,9 @@ import inspect
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Tuple
 from django.conf import settings
-from api_service.models import ApiEndpoint, ApiService, ApiCallLog
+from api_service.models import ApiEndpoint, ApiService, ApiCallLog, ApiRateLimit, ApiBatchRequest
 
 logger = logging.getLogger(__name__)
 
@@ -65,31 +65,110 @@ class BaseAPIService(ABC):
         return ApiEndpoint.objects.filter(
                 service=self.service,
                 name=endpoint_name
-            ).first()     
+            ).first()
+    
+    def _check_rate_limit(self, endpoint_name: str) -> Tuple[bool, float]:
+        """
+        Verifica si se puede hacer una petición según el rate limit.
+        
+        Basado en el patrón de MigoAPIService.
+        
+        Args:
+            endpoint_name (str): Nombre del endpoint
+            
+        Returns:
+            Tuple[bool, float]: (puede_proceder, tiempo_espera_segundos)
+            
+        Example:
+            >>> can_proceed, wait_time = service._check_rate_limit('emitir_comprobante')
+            >>> if not can_proceed:
+            ...     print(f"Esperar {wait_time} segundos")
+        """
+        try:
+            if not getattr(self, 'service', None):
+                return True, 0
+                
+            endpoint = self._get_endpoint(endpoint_name)
+            if endpoint:
+                # Obtener o crear el registro de rate limit para este endpoint
+                rate_limit, created = ApiRateLimit.get_for_service_endpoint(
+                    self.service, endpoint
+                )
+                
+                # Usar el método can_make_request() del modelo
+                if rate_limit.can_make_request():
+                    return True, 0
+                else:
+                    # Si no se puede hacer la petición, obtener tiempo de espera
+                    wait_seconds = rate_limit.get_wait_time()
+                    logger.warning(
+                        f"Rate limit excedido para endpoint {endpoint_name}. "
+                        f"Esperar {wait_seconds:.1f} segundos"
+                    )
+                    return False, wait_seconds
+        except Exception as e:
+            logger.error(f"Error checking rate limit: {str(e)}")
+        
+        # Por defecto, permitir la petición si hay error
+        return True, 0
+    
+    def _update_rate_limit(self, endpoint_name: str) -> None:
+        """
+        Actualiza el rate limit después de una llamada exitosa.
+        
+        Incrementa el contador de peticiones realizadas.
+        
+        Args:
+            endpoint_name (str): Nombre del endpoint
+        """
+        try:
+            if not getattr(self, 'service', None):
+                return
+                
+            endpoint = self._get_endpoint(endpoint_name)
+            if endpoint:
+                # Obtener o crear el registro de rate limit para este endpoint
+                rate_limit, created = ApiRateLimit.get_for_service_endpoint(
+                    self.service, endpoint
+                )
+                
+                # Usar el método increment_count() del modelo
+                rate_limit.increment_count()
+                logger.debug(
+                    f"Rate limit actualizado para endpoint {endpoint_name}. "
+                    f"Conteo actual: {rate_limit.current_count}/{rate_limit.get_limit()}"
+                )
+        except Exception as e:
+            logger.error(f"Error updating rate limit: {str(e)}")
+    
     
     def _log_api_call(self, endpoint_name: str, request_data: dict, 
                      response_data: dict, status: str, error_message: str = "", 
-                     duration_ms: int = 0, batch_request=None,
+                     duration_ms: int = 0, batch_request: ApiBatchRequest = None,
                      caller_info: str = None) -> None:
         """
         Registra llamada API en base de datos.
-        FUNCIÓN REUTILIZADA: Copiada desde tu código existente.
+        
+        Alineado con el patrón de MigoAPIService para consistencia.
         
         Args:
-            endpoint_name: Nombre del endpoint
-            request_data: Datos de la solicitud
-            response_data: Datos de la respuesta
-            status: Estado de la llamada
-            error_message: Mensaje de error (opcional)
-            duration_ms: Duración en milisegundos
-            batch_request: Solicitud por lote (opcional)
-            caller_info: Información del llamador (opcional)
+            endpoint_name (str): Nombre del endpoint
+            request_data (dict): Datos de la solicitud
+            response_data (dict): Datos de la respuesta
+            status (str): Estado de la llamada (SUCCESS, FAILED, etc.)
+            error_message (str): Mensaje de error (opcional)
+            duration_ms (int): Duración en milisegundos
+            batch_request (ApiBatchRequest): Solicitud por lote (opcional)
+            caller_info (str): Información del llamador (opcional)
+            
+        Note:
+            Si no hay servicio configurado (p.ej. en tests), solo loguea sin grabar en BD.
         """
         if caller_info is None:
             caller_info = self._get_caller_info()
 
         # Si no hay servicio (p.ej. tests que evitan inicializar DB), solo loguear
-        if not self.service:
+        if not getattr(self, 'service', None):
             logger.debug(
                 f"[API_CALL] {endpoint_name} status={status} duration={duration_ms}ms error={error_message}"
             )
@@ -97,16 +176,17 @@ class BaseAPIService(ABC):
 
         try:
             endpoint = self._get_endpoint(endpoint_name)
-            print(f" 🔍 Endpoint encontrado: {endpoint}")
+            logger.debug(f"Registrando llamada API: {endpoint_name}")
 
             # Si es un RUC inválido (404), registrar información adicional
             if status == "FAILED" and "404" in error_message:
                 response_data['invalid_ruc'] = True
                 response_data['invalid_reason'] = "RUC_NO_EXISTE_SUNAT"
 
+            # Crear registro de log - endpoint puede ser None
             ApiCallLog.objects.create(
                 service=self.service,
-                endpoint=endpoint.id if endpoint else None,
+                endpoint=endpoint,
                 batch_request=batch_request,
                 status=status,
                 request_data=request_data,
@@ -133,8 +213,3 @@ class BaseAPIService(ABC):
     @property
     def auth_type(self):
         return self.service.auth_type if self.service else None
-    
-    @abstractmethod
-    def send_request(self, endpoint: str, data: dict, method: str = "POST"):
-        """Método abstracto para enviar solicitudes."""
-        pass
