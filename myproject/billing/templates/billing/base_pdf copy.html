@@ -1,0 +1,278 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Documento PDF{% endblock %}</title>
+    
+    <style>
+
+/* Mejoras para tablas en PDF */
+table.items-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+    font-size: 10pt;
+}
+
+table.items-table th {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 6px 8px;
+    text-align: center;
+    font-weight: bold;
+}
+
+table.items-table td {
+    border: 1px solid #dee2e6;
+    padding: 6px 8px;
+    vertical-align: top;
+}
+
+table.items-table .text-left {
+    text-align: left;
+}
+
+table.items-table .text-right {
+    text-align: right;
+}
+
+table.items-table .text-center {
+    text-align: center;
+}
+
+/* Evitar que las tablas se rompan entre páginas */
+table.items-table {
+    page-break-inside: avoid;
+}
+
+table.items-table tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+}
+
+        /* ===== ESTILOS BASE PARA TODOS LOS PDFs ===== */
+        @page {
+            size: A4 portrait;
+            margin: 1.5cm;
+            
+            @frame header_frame {
+                -pdf-frame-content: header_content;
+                top: 0.5cm;
+                margin-left: 1.5cm;
+                margin-right: 1.5cm;
+                height: 3cm;
+            }
+            
+            @frame content_frame {
+                top: 3.5cm;
+                margin-left: 1.5cm;
+                margin-right: 1.5cm;
+                bottom: 2.5cm;
+            }
+            
+            @frame footer_frame {
+                -pdf-frame-content: footer_content;
+                bottom: 0.5cm;
+                margin-left: 1.5cm;
+                margin-right: 1.5cm;
+                height: 1.5cm;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #000000;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Utilidades */
+        .text-right {
+            text-align: right;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .text-left {
+            text-align: left;
+        }
+        
+        .bold {
+            font-weight: bold;
+        }
+        
+        .italic {
+            font-style: italic;
+        }
+        
+        .uppercase {
+            text-transform: uppercase;
+        }
+        
+        .mb-1 {
+            margin-bottom: 0.5cm;
+        }
+        
+        .mb-2 {
+            margin-bottom: 1cm;
+        }
+        
+        .mt-1 {
+            margin-top: 0.5cm;
+        }
+        
+        .mt-2 {
+            margin-top: 1cm;
+        }
+        
+        .p-1 {
+            padding: 0.5cm;
+        }
+        
+        /* Tablas base */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.5cm 0;
+        }
+        
+        table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+            padding: 0.3cm;
+            border: 1px solid #dddddd;
+        }
+        
+        table td {
+            padding: 0.3cm;
+            border: 1px solid #dddddd;
+        }
+        
+        /* Encabezado base */
+        .header {
+            border-bottom: 2px solid #000000;
+            padding-bottom: 0.5cm;
+            margin-bottom: 0.5cm;
+        }
+        
+        .company-logo {
+            max-width: 200px;
+            max-height: 80px;
+        }
+        
+        /* Footer base */
+        .footer {
+            font-size: 9pt;
+            color: #666666;
+            text-align: center;
+            border-top: 1px solid #cccccc;
+            padding-top: 0.3cm;
+        }
+        
+        /* Bloques de información */
+        .info-block {
+            background-color: #f9f9f9;
+            border: 1px solid #eeeeee;
+            border-radius: 3px;
+            padding: 0.5cm;
+            margin-bottom: 0.5cm;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #333333;
+            min-width: 120px;
+            display: inline-block;
+        }
+        
+        /* Totales */
+        .totals-container {
+            float: right;
+            width: 40%;
+            margin-top: 1cm;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.2cm 0;
+            border-bottom: 1px solid #dddddd;
+        }
+        
+        .total-final {
+            font-size: 12pt;
+            font-weight: bold;
+            border-top: 2px solid #000000;
+            margin-top: 0.3cm;
+            padding-top: 0.3cm;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Header (definido en @frame) -->
+    <div id="header_content">
+        {% block header %}
+        <div class="header">
+            <div style="float: left; width: 60%;">
+                <h1 style="margin: 0; color: #2c3e50;">{{ company_info.nombre|default:"MI EMPRESA S.A.C." }}</h1>
+                <p style="margin: 0.2cm 0; font-size: 10pt;">
+                    RUC: {{ company_info.ruc|default:"00000000000" }}<br>
+                    {{ company_info.direccion|default:"Dirección no especificada" }}<br>
+                    Tel: {{ company_info.telefono|default:"" }} | Email: {{ company_info.email|default:"" }}
+                </p>
+            </div>
+            <div style="float: right; width: 35%; text-align: right;">
+                {% block document_header %}
+                <h2 style="margin: 0; color: #2980b9;">DOCUMENTO</h2>
+                <p style="margin: 0.2cm 0; font-size: 10pt;">N°: ---</p>
+                {% endblock %}
+            </div>
+            <div style="clear: both;"></div>
+        </div>
+        {% endblock %}
+    </div>
+    
+    <!-- Contenido principal -->
+    <div id="content">
+        {% block content %}
+        <h3>Contenido del Documento</h3>
+        <p>Este es el contenido base. Sobrescribe este bloque en tus templates.</p>
+        {% endblock %}
+    </div>
+    
+    <!-- Footer (definido en @frame) -->
+    <div id="footer_content">
+        {% block footer %}
+        <div class="footer">
+            <p>
+                {% if document_type == 'invoice' %}
+                Documento Electrónico generado por sistema. Representación impresa del Comprobante de Pago Electrónico.
+                {% else %}
+                Documento generado automáticamente por sistema.
+                {% endif %}
+            </p>
+            <p style="font-size: 8pt;">
+                Fecha de generación: {% now "d/m/Y H:i" %} | 
+                Usuario: {{ user|default:"Sistema" }} |
+                Página <pdf:pagenumber> de <pdf:pagecount>
+            </p>
+        </div>
+        {% endblock %}
+    </div>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

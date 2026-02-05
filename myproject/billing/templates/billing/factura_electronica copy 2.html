@@ -1,0 +1,424 @@
+{% extends "billing/base_pdf.html" %}
+
+{% block title %}Factura Electrónica {{ serie_numero }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ESTILOS MEJORADOS PARA FACTURAS ELECTRÓNICAS */
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        font-size: 10pt;
+        color: #000000;
+    }
+    
+    /* REPRESENTACIÓN IMPRESA - ARRIBA */
+    .representacion-title {
+        text-align: center;
+        font-size: 11pt;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 5px;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 5px;
+    }
+    
+    .invoice-header {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    
+    .invoice-title {
+        font-size: 16pt;
+        font-weight: bold;
+        color: #2c3e50;
+        margin: 5px 0;
+    }
+    
+    .invoice-number {
+        font-size: 14pt;
+        font-weight: bold;
+        color: #c0392b;
+        margin: 5px 0;
+    }
+    
+    /* ENCABEZADO CON INFORMACIÓN */
+    .header-info {
+        margin-bottom: 15px;
+    }
+    
+    .header-left {
+        float: left;
+        width: 60%;
+    }
+    
+    .header-right {
+        float: right;
+        width: 38%;
+        text-align: right;
+    }
+    
+    /* INFORMACIÓN DEL CLIENTE CON FONDO VERDE CLARO */
+    .client-section {
+        background-color: #e8f5e9; /* Verde claro */
+        border: 1px solid #c8e6c9;
+        border-radius: 4px;
+        padding: 12px;
+        margin-bottom: 15px;
+    }
+    
+    .section-title {
+        font-size: 11pt;
+        font-weight: bold;
+        color: #2e7d32;
+        margin-bottom: 8px;
+        border-bottom: 1px solid #a5d6a7;
+        padding-bottom: 3px;
+    }
+    
+    /* TABLA DE PRODUCTOS CON FONDO VERDE CLARO */
+    .items-container {
+        background-color: #f1f8e9; /* Verde muy claro */
+        border: 1px solid #c5e1a5;
+        border-radius: 4px;
+        padding: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 9pt;
+        background-color: white;
+    }
+    
+    /* CABECERA DE TABLA CON TEXTO OSCURO - ¡CAMBIADO! */
+    .items-table thead {
+        background-color: #e8f5e9; /* Fondo verde claro */
+    }
+    
+    .items-table th {
+        padding: 6px 4px;
+        border: 1px solid #2e7d32;
+        font-weight: bold;
+        text-align: center;
+        color: #000000; /* TEXTO NEGRO - CAMBIADO */
+    }
+    
+    .items-table td {
+        padding: 5px 4px;
+        border: 1px solid #c8e6c9;
+        vertical-align: top;
+    }
+    
+    .text-left { text-align: left; }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    
+    /* TABLA DE TOTALES CON FONDO VERDE CLARO */
+    .totals-container {
+        background-color: #e8f5e9; /* Verde claro */
+        border: 1px solid #c8e6c9;
+        border-radius: 4px;
+        padding: 12px;
+        float: right;
+        width: 40%;
+        margin-top: 10px;
+    }
+    
+    .total-row {
+        display: table-row;
+    }
+    
+    .total-label {
+        display: table-cell;
+        padding: 4px 0;
+        width: 70%;
+    }
+    
+    .total-value {
+        display: table-cell;
+        padding: 4px 0;
+        text-align: right;
+        font-weight: normal;
+    }
+    
+    .total-final {
+        border-top: 2px solid #388e3c;
+        margin-top: 6px;
+        padding-top: 6px;
+        font-weight: bold;
+        font-size: 11pt;
+    }
+    
+    /* SECCIÓN QR - REORGANIZADA */
+    .qr-section {
+        text-align: center;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px dashed #ccc;
+    }
+    
+    .qr-box {
+        display: inline-block;
+        padding: 10px;
+        background-color: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
+    
+    .qr-placeholder {
+        width: 100px;
+        height: 100px;
+        background-color: #f5f5f5;
+        border: 1px dashed #ccc;
+        margin: 5px auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 8pt;
+        color: #666;
+    }
+    
+    /* CÓDIGO HASH DEBAJO DEL QR - ¡REORGANIZADO! */
+    .hash-code {
+        font-size: 8pt;
+        color: #333;
+        margin-top: 10px;
+        padding: 5px;
+        background-color: #f8f9fa;
+        border-radius: 3px;
+        border: 1px solid #eee;
+    }
+    
+    /* OBSERVACIONES */
+    .observations {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 4px;
+        padding: 10px;
+        margin: 15px 0;
+        font-size: 9pt;
+    }
+    
+    /* LEYENDA LEGAL - SE MOVERÁ DESPUÉS DEL FOOTER */
+    .legal-text {
+        font-size: 8pt;
+        color: #666;
+        text-align: justify;
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        border-left: 3px solid #6c757d;
+    }
+    
+    /* UTILIDADES */
+    .clearfix {
+        clear: both;
+    }
+    
+    .monospace {
+        font-family: 'Courier New', monospace;
+    }
+    
+    .small {
+        font-size: 8pt;
+    }
+</style>
+{% endblock %}
+
+{% block document_header %}
+<div style="float: left; width: 60%;">
+    <h2 style="margin: 0; color: #2c3e50; font-size: 14pt;">{{ company_info.nombre|default:"MI EMPRESA S.A.C." }}</h2>
+    <p style="margin: 2px 0; font-size: 9pt;">
+        <strong>RUC:</strong> {{ company_info.ruc|default:"00000000000" }}<br>
+        <strong>Dirección:</strong> {{ company_info.direccion|default:"Dirección no especificada" }}
+    </p>
+</div>
+<div style="float: right; width: 38%; text-align: right;">
+    <h3 style="margin: 0; color: #2980b9; font-size: 12pt;">FACTURA ELECTRÓNICA</h3>
+    <p style="margin: 2px 0; font-size: 10pt; font-weight: bold;">{{ serie_numero }}</p>
+    <p style="margin: 0; font-size: 9pt;">
+        <strong>Fecha Emisión:</strong> {{ fecha_emision }}<br>
+        {% if fecha_vencimiento %}
+        <strong>Fecha Venc.:</strong> {{ fecha_vencimiento }}
+        {% endif %}
+    </p>
+</div>
+<div style="clear: both;"></div>
+{% endblock %}
+
+{% block content %}
+<!-- REPRESENTACIÓN IMPRESA - ARRIBA -->
+<div class="representacion-title">
+    REPRESENTACIÓN IMPRESA DEL COMPROBANTE ELECTRÓNICO
+</div>
+
+<!-- ENCABEZADO PRINCIPAL -->
+<div class="invoice-header">
+    <div class="invoice-title">FACTURA ELECTRÓNICA</div>
+    <div class="invoice-number">{{ serie_numero }}</div>
+</div>
+
+<!-- INFORMACIÓN DEL CLIENTE -->
+<div class="client-section">
+    <div class="section-title">INFORMACIÓN DEL CLIENTE</div>
+    <table style="width: 100%; border: none;">
+        <tr>
+            <td style="width: 100px; border: none; padding: 2px 0;"><strong>Razón Social:</strong></td>
+            <td style="border: none; padding: 2px 0;">{{ cliente|upper }}</td>
+        </tr>
+        <tr>
+            <td style="border: none; padding: 2px 0;"><strong>RUC:</strong></td>
+            <td style="border: none; padding: 2px 0;">{{ ruc_cliente }}</td>
+        </tr>
+        <tr>
+            <td style="border: none; padding: 2px 0;"><strong>Dirección:</strong></td>
+            <td style="border: none; padding: 2px 0;">{{ direccion_cliente }}</td>
+        </tr>
+        {% if condiciones_pago %}
+        <tr>
+            <td style="border: none; padding: 2px 0;"><strong>Condición Pago:</strong></td>
+            <td style="border: none; padding: 2px 0;">{{ condiciones_pago }}</td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+
+<!-- DETALLE DE PRODUCTOS/SERVICIOS -->
+<div class="items-container">
+    <div class="section-title">DETALLE DE PRODUCTOS/SERVICIOS</div>
+    
+    <table class="items-table">
+        <thead>
+            <tr>
+                <!-- CABECERA CON TEXTO OSCURO - ¡CAMBIADO! -->
+                <th width="8%" style="color: #000000;">Cant.</th>
+                <th width="10%" style="color: #000000;">Unidad</th>
+                <th width="12%" style="color: #000000;">Código</th>
+                <th width="35%" class="text-left" style="color: #000000;">Descripción</th>
+                <th width="10%" class="text-right" style="color: #000000;">V. Unitario</th>
+                <th width="10%" class="text-right" style="color: #000000;">P. Unitario</th>
+                <th width="15%" class="text-right" style="color: #000000;">Valor Venta</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td class="text-center">{{ item.cantidad|floatformat:2 }}</td>
+                <td class="text-center">{{ item.unidad_de_medida }}</td>
+                <td class="text-center">{{ item.codigo }}</td>
+                <td class="text-left">
+                    {{ item.descripcion|linebreaksbr }}
+                    {% if item.codigo_producto_sunat %}
+                    <br><span class="small">Cód. SUNAT: {{ item.codigo_producto_sunat }}</span>
+                    {% endif %}
+                </td>
+                <td class="text-right">S/ {{ item.valor_unitario|floatformat:2 }}</td>
+                <td class="text-right">S/ {{ item.precio_unitario|floatformat:2 }}</td>
+                <td class="text-right">S/ {{ item.subtotal|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="clearfix"></div>
+
+<!-- TOTALES -->
+<div class="totals-container">
+    <div class="section-title">RESUMEN DE IMPORTES</div>
+    
+    <div style="display: table; width: 100%;">
+        <div class="total-row">
+            <div class="total-label">Op. Gravadas:</div>
+            <div class="total-value">S/ {{ totales.gravada }}</div>
+        </div>
+        <div class="total-row">
+            <div class="total-label">Op. Inafectas:</div>
+            <div class="total-value">S/ {{ total_inafecta|default:"0.00" }}</div>
+        </div>
+        <div class="total-row">
+            <div class="total-label">Op. Exoneradas:</div>
+            <div class="total-value">S/ {{ total_exonerada|default:"0.00" }}</div>
+        </div>
+        <div class="total-row">
+            <div class="total-label">Op. Gratuitas:</div>
+            <div class="total-value">S/ {{ total_gratuita|default:"0.00" }}</div>
+        </div>
+        <div class="total-row">
+            <div class="total-label">Descuentos:</div>
+            <div class="total-value">S/ {{ total_descuento|default:"0.00" }}</div>
+        </div>
+        <div class="total-row">
+            <div class="total-label">IGV (18%):</div>
+            <div class="total-value">S/ {{ totales.igv }}</div>
+        </div>
+        <div class="total-row total-final">
+            <div class="total-label">IMPORTE TOTAL:</div>
+            <div class="total-value">S/ {{ totales.total }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="clearfix"></div>
+
+<!-- OBSERVACIONES -->
+{% if observaciones %}
+<div class="observations">
+    <strong>Observaciones:</strong><br>
+    {{ observaciones|linebreaksbr }}
+</div>
+{% endif %}
+
+<!-- CONDICIONES DE CRÉDITO -->
+{% if venta_al_credito %}
+<div style="background-color: #e3f2fd; border: 1px solid #bbdefb; border-radius: 4px; padding: 10px; margin: 10px 0;">
+    <strong style="color: #1565c0;">Condiciones de Crédito:</strong>
+    <table style="width: 100%; border: none; margin-top: 5px;">
+        {% for cuota in venta_al_credito %}
+        <tr>
+            <td style="border: none; padding: 2px 0; width: 60px;">Cuota {{ cuota.cuota }}:</td>
+            <td style="border: none; padding: 2px 0;">{{ cuota.fecha_de_pago }}</td>
+            <td style="border: none; padding: 2px 0; text-align: right;">S/ {{ cuota.importe|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+
+<!-- SECCIÓN QR - REORGANIZADA -->
+<div class="qr-section">
+    <div class="qr-box">
+        <div class="qr-placeholder">
+            CÓDIGO QR<br>
+            <small>({{ qr_data|truncatechars:30 }})</small>
+        </div>
+        
+        <!-- CÓDIGO HASH DEBAJO DEL QR - ¡REORGANIZADO! -->
+        <div class="hash-code">
+            <strong>Código Hash:</strong> {{ codigo_unico|default:"Generado por SUNAT" }}<br>
+            <strong>Fecha de emisión:</strong> {{ fecha_emision }}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block footer %}
+<div style="font-size: 8pt; color: #666; text-align: center; border-top: 1px solid #ccc; padding-top: 5px;">
+    <p>
+        <strong>Documento Electrónico generado por sistema.</strong><br>
+        Representación impresa del Comprobante de Pago Electrónico - {{ serie_numero }}
+    </p>
+    <p>
+        Fecha de generación: {% now "d/m/Y H:i" %} | 
+        Usuario: {{ user|default:"Sistema" }} |
+        Página <pdf:pagenumber> de <pdf:pagecount>
+    </p>
+</div>
+<div class="legal-text">
+    <strong>LEYENDA:</strong> Esta factura electrónica ha sido generada y autorizada conforme a la Ley N° 28035, Ley de Firmas y Certificados Digitales, y a la Resolución de Superintendencia N° 007-2006/SUNAT. Representación impresa del comprobante de pago electrónico. Para consultar la validez del comprobante, ingresar a https://www.sunat.gob.pe/ o escanear el código QR.
+</div>
+{% endblock %}

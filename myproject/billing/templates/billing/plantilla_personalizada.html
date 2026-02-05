@@ -1,0 +1,413 @@
+{% extends "billing/base_pdf.html" %}
+
+{% block title %}Factura {{ serie_numero }} - Personalizada{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Estilos personalizados para plantilla alternativa */
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #3498db;
+        --accent-color: #e74c3c;
+        --light-bg: #f8f9fa;
+        --border-color: #dee2e6;
+    }
+    
+    .custom-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 0.8cm;
+        border-radius: 8px 8px 0 0;
+        margin-bottom: 0.8cm;
+    }
+    
+    .custom-document-title {
+        font-size: 20pt;
+        font-weight: bold;
+        text-align: center;
+        margin: 0;
+        letter-spacing: 1px;
+    }
+    
+    .custom-document-number {
+        font-size: 16pt;
+        text-align: center;
+        margin: 0.3cm 0;
+        background: rgba(255,255,255,0.1);
+        padding: 0.3cm;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    
+    .custom-company-logo {
+        text-align: center;
+        margin-bottom: 0.5cm;
+    }
+    
+    .logo-placeholder {
+        display: inline-block;
+        width: 150px;
+        height: 80px;
+        background: rgba(255,255,255,0.9);
+        border-radius: 4px;
+        line-height: 80px;
+        font-size: 10pt;
+        color: var(--primary-color);
+        font-weight: bold;
+    }
+    
+    .custom-client-card {
+        background: white;
+        border: 2px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0.6cm;
+        margin-bottom: 0.8cm;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .client-card-title {
+        color: var(--primary-color);
+        border-bottom: 2px solid var(--secondary-color);
+        padding-bottom: 0.2cm;
+        margin-bottom: 0.4cm;
+        font-size: 12pt;
+    }
+    
+    .client-info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.4cm;
+    }
+    
+    .info-item {
+        margin-bottom: 0.2cm;
+    }
+    
+    .info-label {
+        color: var(--primary-color);
+        font-weight: bold;
+        font-size: 10pt;
+        display: block;
+        margin-bottom: 0.1cm;
+    }
+    
+    .info-value {
+        color: #555;
+        font-size: 10pt;
+    }
+    
+    .custom-items-table {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 0.8cm;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .table-header {
+        background: var(--primary-color);
+        color: white;
+        padding: 0.4cm;
+    }
+    
+    .table-row {
+        display: grid;
+        grid-template-columns: 10% 15% 35% 15% 15% 10%;
+        padding: 0.3cm;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .table-row:nth-child(even) {
+        background-color: var(--light-bg);
+    }
+    
+    .table-row.header {
+        font-weight: bold;
+        background: var(--secondary-color);
+        color: white;
+        border-bottom: none;
+    }
+    
+    .custom-totals {
+        background: white;
+        border: 2px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0.6cm;
+        width: 45%;
+        float: right;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .total-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.2cm 0;
+        border-bottom: 1px dashed var(--border-color);
+    }
+    
+    .total-item.final {
+        border-top: 2px solid var(--primary-color);
+        border-bottom: none;
+        margin-top: 0.3cm;
+        padding-top: 0.3cm;
+        font-size: 12pt;
+        color: var(--accent-color);
+        font-weight: bold;
+    }
+    
+    .custom-qr-section {
+        text-align: center;
+        background: var(--light-bg);
+        border-radius: 8px;
+        padding: 0.8cm;
+        margin-top: 1cm;
+        border: 1px solid var(--border-color);
+    }
+    
+    .qr-container {
+        display: inline-block;
+        padding: 0.5cm;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    }
+    
+    .qr-code {
+        width: 120px;
+        height: 120px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        font-size: 9pt;
+        text-align: center;
+        margin: 0 auto;
+    }
+    
+    .stamp {
+        position: absolute;
+        right: 2cm;
+        top: 4cm;
+        transform: rotate(15deg);
+        opacity: 0.1;
+        font-size: 40pt;
+        color: var(--accent-color);
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block header %}
+<!-- Header personalizado -->
+<div class="custom-header">
+    <div class="custom-company-logo">
+        <div class="logo-placeholder">
+            {% if company_info.logo_url %}
+            <!-- <img src="{{ company_info.logo_url }}" style="max-height: 80px;"> -->
+            {% else %}
+            {{ company_info.nombre|default:"LOGO"|truncatechars:10 }}
+            {% endif %}
+        </div>
+    </div>
+    
+    <h1 class="custom-document-title">FACTURA ELECTRÓNICA</h1>
+    <div style="text-align: center;">
+        <div class="custom-document-number">{{ serie_numero }}</div>
+    </div>
+    
+    <div style="text-align: center; font-size: 9pt; opacity: 0.9;">
+        <strong>Fecha Emisión:</strong> {{ fecha_emision }} 
+        {% if fecha_vencimiento %}
+        | <strong>Vencimiento:</strong> {{ fecha_vencimiento }}
+        {% endif %}
+        | <strong>Moneda:</strong> {{ moneda }}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Sello de agua -->
+<div class="stamp">
+    {{ company_info.nombre|default:"COMPAÑÍA" }}
+</div>
+
+<!-- Tarjeta de información del cliente -->
+<div class="custom-client-card">
+    <h3 class="client-card-title">DATOS DEL CLIENTE</h3>
+    
+    <div class="client-info-grid">
+        <div class="info-item">
+            <span class="info-label">RAZÓN SOCIAL</span>
+            <span class="info-value">{{ cliente|upper }}</span>
+        </div>
+        
+        <div class="info-item">
+            <span class="info-label">RUC</span>
+            <span class="info-value">{{ ruc_cliente }}</span>
+        </div>
+        
+        <div class="info-item">
+            <span class="info-label">DIRECCIÓN</span>
+            <span class="info-value">{{ direccion_cliente|truncatechars:60 }}</span>
+        </div>
+        
+        <div class="info-item">
+            <span class="info-label">CONDICIÓN DE PAGO</span>
+            <span class="info-value">{{ condiciones_pago|default:"CONTADO" }}</span>
+        </div>
+        
+        {% if venta_al_credito %}
+        <div class="info-item" style="grid-column: span 2;">
+            <span class="info-label">PLAN DE PAGOS</span>
+            <div class="info-value">
+                {% for cuota in venta_al_credito %}
+                Cuota {{ cuota.cuota }}: S/ {{ cuota.importe|floatformat:2 }} ({{ cuota.fecha_de_pago }}){% if not forloop.last %}<br>{% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Tabla de items con diseño moderno -->
+<div class="custom-items-table">
+    <div class="table-header">
+        <h4 style="margin: 0; font-size: 11pt;">DETALLE DE LA TRANSACCIÓN</h4>
+    </div>
+    
+    <!-- Encabezados de la tabla -->
+    <div class="table-row header">
+        <div>Cant.</div>
+        <div>Unidad</div>
+        <div>Descripción</div>
+        <div>V. Unitario</div>
+        <div>P. Unitario</div>
+        <div>Total</div>
+    </div>
+    
+    <!-- Filas de items -->
+    {% for item in items %}
+    <div class="table-row">
+        <div>{{ item.cantidad|floatformat:2 }}</div>
+        <div>{{ item.unidad_de_medida }}</div>
+        <div>
+            <strong>{{ item.descripcion|truncatechars:50 }}</strong>
+            {% if item.codigo %}
+            <br><small style="color: #666;">Cód: {{ item.codigo }}</small>
+            {% endif %}
+        </div>
+        <div>S/ {{ item.valor_unitario|floatformat:2 }}</div>
+        <div>S/ {{ item.precio_unitario|floatformat:2 }}</div>
+        <div><strong>S/ {{ item.total|floatformat:2 }}</strong></div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Totales -->
+<div class="custom-totals">
+    <h4 style="margin: 0 0 0.4cm 0; color: var(--primary-color); font-size: 11pt;">RESUMEN DE VALORES</h4>
+    
+    <div class="total-item">
+        <span>Subtotal Gravado:</span>
+        <span>S/ {{ totales.gravada }}</span>
+    </div>
+    
+    <div class="total-item">
+        <span>Descuentos:</span>
+        <span>S/ {{ total_descuento|default:"0.00" }}</span>
+    </div>
+    
+    <div class="total-item">
+        <span>IGV (18%):</span>
+        <span>S/ {{ totales.igv }}</span>
+    </div>
+    
+    <div class="total-item">
+        <span>Otros Cargos:</span>
+        <span>S/ {{ total_otros_cargos|default:"0.00" }}</span>
+    </div>
+    
+    <div class="total-item final">
+        <span>TOTAL A PAGAR:</span>
+        <span>S/ {{ totales.total }}</span>
+    </div>
+    
+    <div style="text-align: right; margin-top: 0.3cm; font-size: 9pt; color: #666;">
+        {% if moneda == 'DÓLARES' %}
+        Tipo cambio: {{ tipo_de_cambio|default:"3.80" }}
+        {% endif %}
+    </div>
+</div>
+
+<div style="clear: both;"></div>
+
+<!-- Observaciones -->
+{% if observaciones %}
+<div style="background: #fff8e1; border-left: 4px solid #ffd54f; padding: 0.5cm; margin: 0.8cm 0; border-radius: 0 4px 4px 0;">
+    <strong style="color: #ff8f00;">📝 Observaciones:</strong>
+    <div style="margin-top: 0.2cm; font-size: 10pt;">
+        {{ observaciones|linebreaksbr }}
+    </div>
+</div>
+{% endif %}
+
+<!-- Sección QR -->
+{% if qr_data or qr_url %}
+<div class="custom-qr-section">
+    <div class="qr-container">
+        <h5 style="margin: 0 0 0.3cm 0; color: var(--primary-color);">VALIDACIÓN DEL DOCUMENTO</h5>
+        
+        <div class="qr-code">
+            {% if qr_url %}
+            <!-- QR real aquí -->
+            QR CODE
+            {% else %}
+            CÓDIGO QR<br>(Datos comprimidos)
+            {% endif %}
+        </div>
+        
+        <div style="margin-top: 0.3cm; font-size: 8pt; color: #666;">
+            <strong>Código Único:</strong> {{ codigo_unico|default:"PENDIENTE" }}<br>
+            <strong>Emisión:</strong> {{ fecha_emision }}<br>
+            <strong>Autorización:</strong> SUNAT
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Información legal -->
+<div style="font-size: 8pt; color: #666; text-align: justify; margin-top: 1cm; padding: 0.5cm; background: #f8f9fa; border-radius: 4px;">
+    <p>
+        <strong>Nota Legal:</strong> Este documento electrónico ha sido generado de conformidad con la Resolución de Superintendencia N° 007-2006/SUNAT y la Ley N° 28035. Es válido como comprobante de pago ante la SUNAT. La representación impresa no sustituye al comprobante electrónico original.
+    </p>
+</div>
+{% endblock %}
+
+{% block footer %}
+<div class="footer">
+    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9pt;">
+        <div style="text-align: left;">
+            <strong>{{ company_info.nombre|default:"EMPRESA" }}</strong><br>
+            RUC: {{ company_info.ruc|default:"00000000000" }}
+        </div>
+        
+        <div style="text-align: center;">
+            <strong>Factura Electrónica Válida</strong><br>
+            Sistema automatizado de facturación
+        </div>
+        
+        <div style="text-align: right;">
+            Página <pdf:pagenumber>/<pdf:pagecount><br>
+            {% now "d/m/Y H:i" %}
+        </div>
+    </div>
+    
+    <div style="border-top: 1px solid #dee2e6; margin-top: 0.3cm; padding-top: 0.3cm; font-size: 8pt; text-align: center; color: #999;">
+        Documento generado automáticamente. Para consultas: {{ company_info.email|default:"soporte@empresa.com" }}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,568 @@
+{
+  "config": {
+    "num_requests": 50,
+    "concurrency": 10,
+    "timestamp": "2026-01-30T17:25:12.185746"
+  },
+  "summary": {
+    "successful": 50,
+    "failed": 0,
+    "total_time_seconds": 13.922836303710938,
+    "requests_per_second": 3.591222284691604,
+    "avg_duration_ms": 2508.44,
+    "min_duration_ms": 1356,
+    "max_duration_ms": 6163
+  },
+  "results": [
+    {
+      "request_id": "751d41ba",
+      "numero": 92000,
+      "status": "SUCCESS",
+      "duration_ms": 1909,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/db5b47bc-e86f-4a8e-8a9a-2b1fa6d3dc09",
+        "codigo_hash": "RZycV39Lhq14JyQp/sFiO7QlgIrIRgqmzTN5U0TILmQ="
+      }
+    },
+    {
+      "request_id": "91d14da0",
+      "numero": 92001,
+      "status": "SUCCESS",
+      "duration_ms": 2219,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/0ed421d7-d948-4ddf-af92-8eef48ca52ce",
+        "codigo_hash": "gJCNxJTpWdViz9zRq5XrikqdIDYqK6cZTxhKWc5gld0="
+      }
+    },
+    {
+      "request_id": "a9d82ccc",
+      "numero": 92002,
+      "status": "SUCCESS",
+      "duration_ms": 2165,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/870c85dc-e259-40e0-95a6-08853ac35491",
+        "codigo_hash": "YZv0Kzhcdi9mzEHpDfysPx2Iog+P+BzyHl7T8EGnqXU="
+      }
+    },
+    {
+      "request_id": "72dc8df5",
+      "numero": 92003,
+      "status": "SUCCESS",
+      "duration_ms": 1886,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/f4d78ad0-d529-48c9-91e5-ae609e4fb596",
+        "codigo_hash": "NqSWSbtZxSh34n2Sr5JgxkKSFQwVtXW0BufFSJoskWY="
+      }
+    },
+    {
+      "request_id": "4aeeeda4",
+      "numero": 92004,
+      "status": "SUCCESS",
+      "duration_ms": 3319,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/374a4423-7c8b-4c92-8c8f-c977adc82478",
+        "codigo_hash": "GqbWuuX1Jrnni+3PrbxmQHCfNLHfY/Ht+HS59sSNcH4="
+      }
+    },
+    {
+      "request_id": "afed2831",
+      "numero": 92005,
+      "status": "SUCCESS",
+      "duration_ms": 2448,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/d800bcd2-333d-4ade-8ecf-a43f393f96f9",
+        "codigo_hash": "2tIihW/QFwNznJUke9o0/GESOGTSO4KqlzNu5OBj1tU="
+      }
+    },
+    {
+      "request_id": "4e384f53",
+      "numero": 92006,
+      "status": "SUCCESS",
+      "duration_ms": 1935,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/98e56981-1edd-4af7-a221-a520207df529",
+        "codigo_hash": "OlyOr8U75qWpt1O93lSqjOJblfTjh050rfEPVGrCBMY="
+      }
+    },
+    {
+      "request_id": "48349f3f",
+      "numero": 92007,
+      "status": "SUCCESS",
+      "duration_ms": 1905,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/96c046df-dd09-4ac7-9dad-e59f381e4030",
+        "codigo_hash": "JK/kwedEd6cWYAWqcC7AAbs0AJmKy1Qs3JQKpoTjW38="
+      }
+    },
+    {
+      "request_id": "6bced6e0",
+      "numero": 92008,
+      "status": "SUCCESS",
+      "duration_ms": 1905,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/bed6b010-eded-43f7-926e-74cee58a96d5",
+        "codigo_hash": "q3keEhmFwxJFpTPQhgfo93GlTUMLJsIk61/0uXmbFzY="
+      }
+    },
+    {
+      "request_id": "576d9835",
+      "numero": 92009,
+      "status": "SUCCESS",
+      "duration_ms": 2185,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/33eb8702-033b-41dd-b52d-5e57d0748b8e",
+        "codigo_hash": "sBbtvF8wVEuzgZwZ2FUm1B+a/PJV7x6bhLD6YPtwgwc="
+      }
+    },
+    {
+      "request_id": "cdcde2e5",
+      "numero": 92010,
+      "status": "SUCCESS",
+      "duration_ms": 6163,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/5418eb46-aa15-43c1-b8e5-0e2297cee1df",
+        "codigo_hash": "GAXMAcBDkWoykcA2Lm6Q355YiyDpO7/4eg4u8WC7HJw="
+      }
+    },
+    {
+      "request_id": "7d8c0a15",
+      "numero": 92011,
+      "status": "SUCCESS",
+      "duration_ms": 2440,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/bd25c152-22b4-410a-90bd-223483eb12d5",
+        "codigo_hash": "qD9ACIKvT3H5vxK6XNGSuJ0MMc6NhwGJSQ3c2HOkiKg="
+      }
+    },
+    {
+      "request_id": "0a577018",
+      "numero": 92012,
+      "status": "SUCCESS",
+      "duration_ms": 2009,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/0357572b-99cf-4ae8-a83a-3a08a96bf4e0",
+        "codigo_hash": "zxcvDxIT3VIjkJyGLi+R/oOIhqh3jEzU7NVgVKuJGLQ="
+      }
+    },
+    {
+      "request_id": "c2ab0168",
+      "numero": 92013,
+      "status": "SUCCESS",
+      "duration_ms": 2353,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/93a9e2ba-48be-4634-92da-e94fce7259fa",
+        "codigo_hash": "EJ3cQK7gxutxwVTA4cIrcVP1MTWOA3L3x52q5DtWGlA="
+      }
+    },
+    {
+      "request_id": "231d5cf2",
+      "numero": 92014,
+      "status": "SUCCESS",
+      "duration_ms": 1786,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/abc3e467-3556-40df-86d9-4600623235be",
+        "codigo_hash": "I+fsxGYtpW5vupv7Slk+SLS6fYBYFS/d4zCcMAYkUpk="
+      }
+    },
+    {
+      "request_id": "3d2f87bf",
+      "numero": 92015,
+      "status": "SUCCESS",
+      "duration_ms": 2550,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/9f84184a-58f3-4d21-b97e-1126634f5a29",
+        "codigo_hash": "WywKY9B9U/158xzdJ7OI0eyFlCYqdJfEt4hRjsehzjo="
+      }
+    },
+    {
+      "request_id": "7d169693",
+      "numero": 92016,
+      "status": "SUCCESS",
+      "duration_ms": 3532,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/b4a59784-a5a8-454b-aa13-f4a8f7d77b2b",
+        "codigo_hash": "yYmswmi7yc1SYF8XrAQB5Yc5RQCohwaVrThJi2ylOJY="
+      }
+    },
+    {
+      "request_id": "05379b3a",
+      "numero": 92017,
+      "status": "SUCCESS",
+      "duration_ms": 2106,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/6f33c3f0-a9a9-4e40-a421-670aa54bab79",
+        "codigo_hash": "OKls7Foe1ccxbKi7kAkG6saULn7RN6UtHgclhY9fHwA="
+      }
+    },
+    {
+      "request_id": "405cbee6",
+      "numero": 92018,
+      "status": "SUCCESS",
+      "duration_ms": 4951,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/1700229c-37fa-4b53-a008-7cbe813a98b6",
+        "codigo_hash": "E/3piurHiPc+k2k0EInV8nt6JJxeIuSqLZSjDseMXy4="
+      }
+    },
+    {
+      "request_id": "e8416950",
+      "numero": 92019,
+      "status": "SUCCESS",
+      "duration_ms": 4566,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/0094a49e-1ebf-40e9-bfd9-9051d58aa2e7",
+        "codigo_hash": "c11U67CK2GoTJZD87A0uNZKn+OOiLv7fCXP0BLSBsqs="
+      }
+    },
+    {
+      "request_id": "c6cfc4a0",
+      "numero": 92020,
+      "status": "SUCCESS",
+      "duration_ms": 2384,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/a4c925af-2d0c-43f3-a3c1-a1d5fd421af4",
+        "codigo_hash": "ijCR3aqT85GSJ8ext1MIc/TKYz+zuSEbNsXQG8fubbg="
+      }
+    },
+    {
+      "request_id": "0ee3b822",
+      "numero": 92021,
+      "status": "SUCCESS",
+      "duration_ms": 3870,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/7074f9d7-7385-4c17-9c0b-070bdea77733",
+        "codigo_hash": "WGwMoA650L93sMuEN1UCeAdCMgDUchX273P60syYIOE="
+      }
+    },
+    {
+      "request_id": "37d93565",
+      "numero": 92022,
+      "status": "SUCCESS",
+      "duration_ms": 2307,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/e6dc42e0-8dee-405a-9e26-5110330c94ad",
+        "codigo_hash": "F/27fpfUyXVF436OJk8AwHjCot8lOMd82XwXVZZCQbI="
+      }
+    },
+    {
+      "request_id": "27efca2d",
+      "numero": 92023,
+      "status": "SUCCESS",
+      "duration_ms": 1497,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/8a788019-1aad-44d8-8d9b-916a46b57efe",
+        "codigo_hash": "YqUrQg708bR7Qyh33pfkMsU39ZU10B9twRWJWEDFwUM="
+      }
+    },
+    {
+      "request_id": "29c38c12",
+      "numero": 92024,
+      "status": "SUCCESS",
+      "duration_ms": 4790,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/4ccb42ef-805b-43e8-ac5c-d89d45abf68e",
+        "codigo_hash": "svOs8/KLat0IfwrZKywxSe1SrvTm7EkRBxwrdYvkpjM="
+      }
+    },
+    {
+      "request_id": "23669eaf",
+      "numero": 92025,
+      "status": "SUCCESS",
+      "duration_ms": 3180,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/7485c232-6aa5-4fac-97f4-afaf2c89f116",
+        "codigo_hash": "TE9+cGmWsmInHzqyjR/hwQtBtRoWAO7ZSyKxnPOi3DM="
+      }
+    },
+    {
+      "request_id": "949eaf99",
+      "numero": 92026,
+      "status": "SUCCESS",
+      "duration_ms": 1459,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/5e0134ca-d0d5-4ee7-b558-d8c910698029",
+        "codigo_hash": "VytXfjJzPrt2DpTULwHb11HmA4eIEc/hAA5d3xdBGF4="
+      }
+    },
+    {
+      "request_id": "39039105",
+      "numero": 92027,
+      "status": "SUCCESS",
+      "duration_ms": 4780,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/a8a42a8d-3c63-4477-8de6-6465b54ac567",
+        "codigo_hash": "0gmulz5mInjGVW6vpCq3F5Wlf1Q3vc+n8rpBGuMDaMw="
+      }
+    },
+    {
+      "request_id": "7922bcb2",
+      "numero": 92028,
+      "status": "SUCCESS",
+      "duration_ms": 2159,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/5f0c4bc3-ac23-4da9-9de5-745867543785",
+        "codigo_hash": "FZ4C+yhRU97I07M7ODtUE3q36dl8YYNLrT85jVdUl1U="
+      }
+    },
+    {
+      "request_id": "2e3f7148",
+      "numero": 92029,
+      "status": "SUCCESS",
+      "duration_ms": 1393,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/ae548b3b-db34-4642-a119-dd4af6d91358",
+        "codigo_hash": "OvaT9JfOZiYqg1hBGpThgPlH5auI/bZJoCbNHjGJBLU="
+      }
+    },
+    {
+      "request_id": "42477dd6",
+      "numero": 92030,
+      "status": "SUCCESS",
+      "duration_ms": 4528,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/001e99c9-6469-426c-b0a3-7d7328542f36",
+        "codigo_hash": "507tULCNuRNBBrbykKblk9QP9lXjslUw8cw0yCPQVwc="
+      }
+    },
+    {
+      "request_id": "43f3efba",
+      "numero": 92031,
+      "status": "SUCCESS",
+      "duration_ms": 3708,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/a46ecf71-4e9a-4e9a-be24-2ccb8c3ba733",
+        "codigo_hash": "pPtgT8Fz+f5kjYNyajeblPtMGxXkQ32gaCtAdVLupQg="
+      }
+    },
+    {
+      "request_id": "029f5d48",
+      "numero": 92032,
+      "status": "SUCCESS",
+      "duration_ms": 1539,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/521957b7-8e49-44aa-a410-2f6f6be40082",
+        "codigo_hash": "NN748YJqIeZmhnSZz2VVnSMDsVvJ0t8BFk4fuhbueUc="
+      }
+    },
+    {
+      "request_id": "460047f9",
+      "numero": 92033,
+      "status": "SUCCESS",
+      "duration_ms": 1790,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/3891f4f3-8d26-44ba-95e5-799cc1b761f8",
+        "codigo_hash": "QhC5GnPZPGjxOOwlcjKHdS2LqE1WnnIsPRDBE5/2j7g="
+      }
+    },
+    {
+      "request_id": "8cf18223",
+      "numero": 92034,
+      "status": "SUCCESS",
+      "duration_ms": 2511,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/8dce61ee-c3a5-4feb-922e-949164df0479",
+        "codigo_hash": "h3ytjowR2uFBP8g8oyVtbZzm6H2/SocW4nhZHJw97H4="
+      }
+    },
+    {
+      "request_id": "01998609",
+      "numero": 92035,
+      "status": "SUCCESS",
+      "duration_ms": 1604,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/188ea832-4f6a-4954-80ff-f89b66ef2aee",
+        "codigo_hash": "SM1AM/Q9f2jSpTLwCJRrkmpkWYGb+rCs8KkYJ2O1DUQ="
+      }
+    },
+    {
+      "request_id": "707dc665",
+      "numero": 92036,
+      "status": "SUCCESS",
+      "duration_ms": 1996,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/b4ff4cc1-8c36-47e5-95a7-67200433ab0c",
+        "codigo_hash": "t43UsIG/knFs+3BIEe7vLQBpWMiEK5jScKlvRBOU+N0="
+      }
+    },
+    {
+      "request_id": "6997c9a9",
+      "numero": 92037,
+      "status": "SUCCESS",
+      "duration_ms": 1549,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/f8286094-d878-4a0b-b0e6-91fe933193b7",
+        "codigo_hash": "U7PakQj1aEBlutnBspSGjJ4wNKZNRD5IRQv+C4RJdOQ="
+      }
+    },
+    {
+      "request_id": "331d9d5a",
+      "numero": 92038,
+      "status": "SUCCESS",
+      "duration_ms": 1983,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/d28b2b8f-cb8a-4b61-8883-cb3e387f95d9",
+        "codigo_hash": "+i+LG2Oc6803Cvps585Ip8n+9Delu9Ad3gM9C1BlG8c="
+      }
+    },
+    {
+      "request_id": "a891e4fd",
+      "numero": 92039,
+      "status": "SUCCESS",
+      "duration_ms": 1440,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/1cb5cde7-04ee-4b80-89f1-464711493415",
+        "codigo_hash": "avAdaUQS4lDu2zZ7XXFjWR/ocmtS6VF2qjUTtz8j9ro="
+      }
+    },
+    {
+      "request_id": "ba543840",
+      "numero": 92040,
+      "status": "SUCCESS",
+      "duration_ms": 1565,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/32989693-772d-4f26-9cea-bd8e5d4a205e",
+        "codigo_hash": "y/gYxCl2JvESxIzAiWMfSeHzL//fxcjaDG9iADWvwkU="
+      }
+    },
+    {
+      "request_id": "986c8a80",
+      "numero": 92041,
+      "status": "SUCCESS",
+      "duration_ms": 3099,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/1ff85487-1e30-4f6a-8da3-cd7b1b9cf694",
+        "codigo_hash": "rkvGJYBEIUtMxH4Gw8LUocUQ6FBMkr2r1StW7T1PSKU="
+      }
+    },
+    {
+      "request_id": "49c5ecfe",
+      "numero": 92042,
+      "status": "SUCCESS",
+      "duration_ms": 2612,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/0a223808-6c1d-44bc-85cf-34bb10401e61",
+        "codigo_hash": "f9jeYojHctYZHQTGOWpHz+nVTCIZKue3v10X8KoiJq0="
+      }
+    },
+    {
+      "request_id": "c61e58e1",
+      "numero": 92043,
+      "status": "SUCCESS",
+      "duration_ms": 1385,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/7e1a8532-f33a-44c6-a790-b409a6ca6f8e",
+        "codigo_hash": "mT/UuhgylB4pD9kwzgC35208oO0RaUSCRlkuxQlU00I="
+      }
+    },
+    {
+      "request_id": "ca2646eb",
+      "numero": 92044,
+      "status": "SUCCESS",
+      "duration_ms": 2208,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/bd8f8157-0285-4d06-a577-335694ec31da",
+        "codigo_hash": "UWbDstAH9NKWUiCBZukVcVcreg/12BL4DLj4IeA2LQk="
+      }
+    },
+    {
+      "request_id": "54b57a4a",
+      "numero": 92045,
+      "status": "SUCCESS",
+      "duration_ms": 1356,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/93fdde0c-0003-4b65-b1ce-9976a77e69f1",
+        "codigo_hash": "hXEKae2PJUiJUxN2NKEq2Q+ReHYVG2MyRo7QHac7jkY="
+      }
+    },
+    {
+      "request_id": "1e26c5fc",
+      "numero": 92046,
+      "status": "SUCCESS",
+      "duration_ms": 2639,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/1ce2d47e-c926-41bd-a471-7e01dc18f163",
+        "codigo_hash": "m359UFtCG7x8SAEAuAj39a0hFKmx51++Bn32NpIve3E="
+      }
+    },
+    {
+      "request_id": "0255e11b",
+      "numero": 92047,
+      "status": "SUCCESS",
+      "duration_ms": 1457,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/f5906bbf-9c44-4e32-b9eb-ac01dbf2dae9",
+        "codigo_hash": "bQ7rowxI13y4p0YC3D38679UWP4eHbWwJCGHBu3UHLk="
+      }
+    },
+    {
+      "request_id": "cd2d4fa8",
+      "numero": 92048,
+      "status": "SUCCESS",
+      "duration_ms": 1522,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/63642d39-59c6-40b0-a839-19d2913c7d73",
+        "codigo_hash": "RMOKhUuljinleVhTnyR2hNsJJoG7tk5pjbZ6YvCBk+U="
+      }
+    },
+    {
+      "request_id": "1dfa6274",
+      "numero": 92049,
+      "status": "SUCCESS",
+      "duration_ms": 2780,
+      "error": null,
+      "response": {
+        "enlace": "https://www.nubefact.com/cpe/f9f3c0e2-66fe-4f1f-81fa-489a22203400",
+        "codigo_hash": "7/qpgDEDdOhES+vb9HqSYetzpE232YB6dPUy9keLsqY="
+      }
+    }
+  ]
+}
