@@ -1,0 +1,195 @@
+<!-- myproject\billing\templates\billing\base_pdf.html  -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Documento PDF{% endblock %}</title>
+    
+    <style>
+        /* ===== ESTILOS BASE PARA TODOS LOS PDFs ===== */
+        @page {
+            size: A4 portrait;
+            margin: 1.5cm;
+            
+            @frame header_frame {
+                -pdf-frame-content: header_content;
+                top: 0.5cm;
+                margin-left: 1.5cm;
+                margin-right: 1.5cm;
+                height: 3cm;
+            }
+            
+            @frame content_frame {
+                top: 3.5cm;
+                margin-left: 1.5cm;
+                margin-right: 1.5cm;
+                bottom: 2.5cm;
+            }
+            
+            @frame footer_frame {
+                -pdf-frame-content: footer_content;
+                bottom: 0.5cm;
+                margin-left: 1.5cm;
+                margin-right: 1.5cm;
+                height: 1.5cm;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 8pt;
+            line-height: 1.3;
+            color: #000000;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Utilidades */
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .text-left { text-align: left; }
+        .bold { font-weight: bold; }
+        .italic { font-style: italic; }
+        .uppercase { text-transform: uppercase; }
+        
+        /* Encabezado mejorado con tabla */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 5px;
+        }
+        
+        .header-table td {
+            vertical-align: top;
+            padding: 2px 0;
+            border: none;
+        }
+        
+        .company-name {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 10pt;
+            margin-bottom: 2px;
+        }
+        
+        .company-contact {
+            font-size: 7pt;
+            line-height: 1.1;
+            text-align: right;
+        }
+        
+        .company-logo {
+            max-width: 120px;
+            max-height: 50px;
+            margin-top: 3px;
+        }
+        
+        /* Línea divisoria única */
+        .header-divider {
+            border-bottom: 1px solid #cccccc;
+            margin-top: 5px;
+            padding-bottom: 5px;
+        }
+        
+        /* Footer base */
+        .footer {
+            font-size: 7pt;
+            color: #666666;
+            text-align: center;
+            border-top: 1px solid #cccccc;
+            padding-top: 3px;
+        }
+        
+        /* Estilos para tablas en facturas (mantener compatibilidad) */
+        table.items-table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 10px 0;
+            font-size: 8pt;
+        }
+        
+        table.items-table th {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 4px 6px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        table.items-table td {
+            border: 1px solid #dee2e6;
+            padding: 4px 6px;
+            vertical-align: top;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Header (definido en @frame) -->
+    <div id="header_content">
+        {% block header %}
+        <div class="header-divider">
+            <table class="header-table">
+                <tr>
+                    <!-- COLUMNA IZQUIERDA: Nombre de empresa -->
+                    <td width="50%" style="vertical-align: top;">
+                        <div class="company-name">{{ company_info.nombre|default:"MI EMPRESA S.A.C." }}</div>
+                        {% if company_info.logo %}
+                        <img src="{{ company_info.logo }}" alt="Logo" class="company-logo">
+                        {% endif %}
+                    </td>
+                    
+                    <!-- COLUMNA DERECHA: Información de contacto -->
+                    <td width="50%" style="vertical-align: top;">
+                        <div class="company-contact">
+                            <strong>RUC:</strong> {{ company_info.ruc|default:"00000000000" }}<br>
+                            {{ company_info.direccion|default:"Dirección no especificada" }}<br>
+                            {% if company_info.telefono %}
+                            <strong>Tel:</strong> {{ company_info.telefono }}<br>
+                            {% endif %}
+                            {% if company_info.email %}
+                            <strong>Email:</strong> {{ company_info.email }}
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        {% endblock %}
+    </div>
+    
+    <!-- Contenido principal -->
+    <div id="content">
+        {% block content %}
+        <h3 style="font-size: 9pt;">Contenido del Documento</h3>
+        <p>Este es el contenido base. Sobrescribe este bloque en tus templates.</p>
+        {% endblock %}
+    </div>
+    
+    <!-- Footer (definido en @frame) -->
+    <div id="footer_content">
+        {% block footer %}
+        <div class="footer">
+            <p>
+                {% if document_type == 'invoice' %}
+                Documento Electrónico generado por sistema. Representación impresa del Comprobante de Pago Electrónico.
+                {% else %}
+                Documento generado automáticamente por sistema.
+                {% endif %}
+            </p>
+            <p style="font-size: 6pt;">
+                Fecha de generación: {% now "d/m/Y H:i" %} | 
+                Usuario: {{ user|default:"Sistema" }} |
+                Página <pdf:pagenumber> de <pdf:pagecount>
+            </p>
+        </div>
+        {% endblock %}
+    </div>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

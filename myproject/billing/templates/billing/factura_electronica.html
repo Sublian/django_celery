@@ -1,0 +1,515 @@
+<!-- myproject\billing\templates\billing\factura_electronica.html  -->
+{% extends "billing/base_pdf.html" %}
+
+{% block title %}Factura Electrónica {{ serie_numero }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ESTILOS OPTIMIZADOS PARA FACTURAS ELECTRÓNICAS */
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        font-size: 8pt;
+        color: #000000;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* ===== ENCABEZADO DE EMPRESA ===== */
+    .company-header {
+        margin-bottom: 8px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #cccccc;
+    }
+    
+    .company-name {
+        font-weight: bold;
+        color: #2c3e50;
+        font-size: 10pt;
+        margin-bottom: 2px;
+    }
+    
+    .company-contact {
+        font-size: 7pt;
+        line-height: 1.1;
+        text-align: right;
+    }
+    
+    /* ===== TÍTULO DE FACTURA ===== */
+    .factura-title {
+        text-align: center;
+        font-weight: bold;
+        font-size: 12pt;
+        color: #2c3e50;
+        margin: 5px 0;
+    }
+    
+    .factura-number {
+        text-align: center;
+        font-weight: bold;
+        font-size: 11pt;
+        color: #c0392b;
+        margin: 0 0 8px 0;
+    }
+    
+    /* ===== SECCIÓN INFORMACIÓN DUAL - REDUCIDA ===== */
+    .info-section {
+        margin: 6px 0;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 2px;
+        padding: 4px;
+        font-size: 7pt;
+    }
+
+    .info-section table table {
+        border: none !important;
+    }
+    
+    .info-section table table td {
+        border: none !important;
+        line-height: 1.1;
+        padding: 0px 2px;
+    }
+
+    .info-title {
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 2px;
+        font-size: 7pt;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 1px;
+    }
+    
+    /* ===== TABLA DE PRODUCTOS ===== */
+    .items-container {
+        background-color: #f1f8e9;
+        border: 1px solid #c5e1a5;
+        border-radius: 3px;
+        padding: 4px;
+        margin: 6px 0;
+    }
+    
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 6pt;
+        background-color: white;
+        table-layout: fixed;
+    }
+    
+    .items-table thead {
+        background-color: #e8f5e9;
+    }
+    
+    .items-table th {
+        padding: 2px 1px;
+        border: 1px solid #2e7d32;
+        font-weight: bold;
+        text-align: center;
+        color: #000000;
+        font-size: 6pt;
+    }
+    
+    .items-table td {
+        padding: 1px;
+        border: 1px solid #c8e6c9;
+        vertical-align: top;
+        font-size: 6pt;
+    }
+    
+    .text-left { text-align: left; }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    
+    /* ===== ESTILOS PARA RESUMEN DE IMPORTES ===== */
+    .summary-table {
+        width: 100%;
+        background-color: #e8f5e9;
+        border: 1px solid #c8e6c9;
+        border-radius: 3px;
+        margin: 0;
+        border-collapse: collapse;
+        font-size: 7pt;
+        line-height: 1.2; 
+    }
+    
+    .summary-header {
+        border: none;
+        padding: 3px 6px;
+        font-weight: bold;
+        font-size: 7pt;
+        background-color: #c8e6c9;
+        line-height: 1.2; 
+    }
+    
+    .summary-row td {
+        border: none;
+        padding: 2px 6px;
+        font-size: 7pt;
+        vertical-align: middle;
+        line-height: 1.3;
+    }
+    
+    .summary-label {
+        width: 70%;
+    }
+    
+    .summary-value {
+        text-align: right;
+    }
+    
+    .summary-total {
+        border-top: 1px solid #388e3c;
+        padding: 3px 6px;
+        font-weight: bold;
+        font-size: 8pt;
+        line-height: 1.4;
+    }
+    
+    /* ===== ESTILOS PARA QR A LA IZQUIERDA ===== */
+    .qr-left-section {
+        float: left;
+        width: 55%;
+        margin-top: 8px;
+    }
+    
+    .qr-container {
+        text-align: center;
+        padding: 6px;
+        background-color: white;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+        display: inline-block;
+    }
+    
+    .qr-placeholder {
+        width: 90px;
+        height: 90px;
+        background-color: #f5f5f5;
+        border: 1px dashed #ccc;
+        margin: 0 auto 6px auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 6pt;
+        color: #666;
+        text-align: center;
+    }
+    
+    .hash-info {
+        font-size: 5pt;
+        color: #333;
+        margin-top: 4px;
+        padding: 2px;
+        background-color: #f8f9fa;
+        border-radius: 1px;
+        border: 1px solid #eee;
+    }
+    
+    /* ===== OBSERVACIONES ===== */
+    .observations {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 3px;
+        padding: 4px;
+        margin: 6px 0;
+        font-size: 6pt;
+    }
+    
+    /* ===== LEYENDA LEGAL ===== */
+    .legal-text {
+        font-size: 5pt;
+        color: #666;
+        text-align: justify;
+        margin-top: 8px;
+        padding: 4px;
+        background-color: #f8f9fa;
+        border-radius: 2px;
+        border-left: 1px solid #6c757d;
+    }
+    
+    /* ===== UTILIDADES ===== */
+    .clear {
+        clear: both;
+    }
+    
+    .small {
+        font-size: 5pt;
+    }
+    
+    .nowrap {
+        white-space: nowrap;
+    }
+
+    /* ===== CONTROL DE PAGINACIÓN ===== */
+    .items-table {
+        page-break-inside: auto;
+    }
+
+    .items-table tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+
+    .items-table td, .items-table th {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+
+    /* Forzar que ciertas secciones no se dividan */
+    .qr-container, .summary-table, .observations {
+        page-break-inside: avoid;
+    }
+
+    /* Asegurar que el resumen y QR estén juntos */
+    .qr-left-section {
+        page-break-inside: avoid;
+    }
+
+    /* Estilo para encabezado de continuación */
+    .continued-header {
+        background-color: #f8f9fa;
+        padding: 5px;
+        font-weight: bold;
+        text-align: center;
+        border-bottom: 1px solid #ccc;
+        margin-bottom: 5px;
+        font-size: 8pt;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ENCABEZADO DE EMPRESA - Se hereda de base_pdf -->
+
+<!-- TÍTULO PRINCIPAL DE FACTURA -->
+<div class="factura-title">FACTURA ELECTRÓNICA</div>
+<div class="factura-number">{{ serie_numero }}</div>
+
+<!-- SECCIÓN DE INFORMACIÓN DUAL COMPACTA -->
+<div class="info-section">
+    <table width="100%" style="border-collapse: collapse;">
+        <tr>
+            <!-- COLUMNA IZQUIERDA: Dirección de Facturación -->
+            <td width="50%" style="vertical-align: top; padding-right: 8px;">
+                <div class="info-title">Dirección De Facturación:</div>
+                <div style="line-height: 1.2;">
+                    <strong>{{ nombre_comercial|default:cliente }}</strong><br>
+                    {{ direccion_cliente }}<br>
+                    Celular: {{ celular|default:"N/A" }}<br>
+                    RUC: {{ ruc_cliente }}
+                </div>
+            </td>
+            
+            <!-- COLUMNA DERECHA: Datos de Emisión en 2 columnas -->
+            <td width="50%" style="vertical-align: top; border: none;">
+                <div class="info-title">Datos de Emisión:</div>
+                <table width="100%" style="border-collapse: collapse; font-size: 7pt; border: 0;">
+                    <tr>
+                        <td style="text-align: right; padding: 0px 3px 0px 0; width: 50%;">Fecha Emisión:</td>
+                        <td style="padding: 0px 0; width: 50%;">{{ fecha_emision }}</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: right; padding: 0px 3px 0px 0;"># Pedido:</td>
+                        <td style="padding: 0px 0;">{{ identificador|default:"N/A" }}</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: right; padding: 0px 3px 0px 0;">Forma De Pago:</td>
+                        <td style="padding: 0px 0;">{{ metodo_pago|default:condiciones_pago|default:"Contado" }}</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: right; padding: 0px 3px 0px 0;">F.Vencimiento:</td>
+                        <td style="padding: 0px 0;">{{ fecha_vencimiento|default:"N/A" }}</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: right; padding: 0px 3px 0px 0;">Periodo:</td>
+                        <td style="padding: 0px 0;">{{ periodo|default:"N/A" }}</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: right; padding: 0px 3px 0px 0;">O/C:</td>
+                        <td style="padding: 0px 0;">{{ otros|default:"N/A" }}</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- DETALLE DE PRODUCTOS/SERVICIOS -->
+<div class="items-container">
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th width="5%">It</th>
+                <th width="40%" class="text-left">Descripción</th>
+                <th width="8%">Cant.</th>
+                <th width="10%">Unidad</th>
+                <th width="12%" class="text-right">P.Unitario</th>
+                <th width="10%" class="text-right">Impuesto</th>
+                <th width="15%" class="text-right">Precio</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr style="page-break-inside: avoid; page-break-after: auto;">
+                <td class="text-center">{{ forloop.counter }}</td>
+                <td class="text-left">
+                    {{ item.descripcion }}
+                    {% if item.codigo %}
+                    <br><span class="small">Cód: {{ item.codigo }}</span>
+                    {% endif %}
+                    {% if item.codigo_producto_sunat %}
+                    <br><span class="small">SUNAT: {{ item.codigo_producto_sunat }}</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">{{ item.cantidad|floatformat:2 }}</td>
+                <td class="text-center">{{ item.unidad_de_medida }}</td>
+                <td class="text-right">S/ {{ item.precio_unitario|floatformat:2 }}</td>
+                <td class="text-right">S/ {{ item.igv|default:"0.00"|floatformat:2 }}</td>
+                <td class="text-right">S/ {{ item.subtotal|floatformat:2 }}</td>
+            </tr>
+            
+            <!-- Forzar nueva página después de cierta cantidad de items -->
+            {% if forloop.counter|divisibleby:10 and not forloop.last %}
+            <tr style="page-break-before: always;">
+                
+                <td colspan="7" style="border: none; padding: 0;">
+                    <!-- Encabezado repetido en nueva página -->
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                        <thead>
+                            <tr>
+                                <th width="5%">It</th>
+                                <th width="40%" class="text-left">Descripción</th>
+                                <th width="8%">Cant.</th>
+                                <th width="10%">Unidad</th>
+                                <th width="12%" class="text-right">P.Unitario</th>
+                                <th width="10%" class="text-right">Impuesto</th>
+                                <th width="15%" class="text-right">Precio</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="clear"></div>
+
+<!-- SECCIÓN CON QR A LA IZQUIERDA Y RESUMEN A LA DERECHA -->
+<table width="100%" style="border: none; margin-top: 6px;">
+    <tr>
+        <!-- COLUMNA IZQUIERDA: QR -->
+        <td width="55%" style="vertical-align: top; border: none; padding: 0;">
+            <div class="qr-left-section">
+                <div class="qr-container">
+                    <div class="qr-placeholder">
+                        {% if qr_data %}
+                        CÓDIGO QR<br>
+                        <small>({{ qr_data|truncatechars:15 }})</small>
+                        {% else %}
+                        <div style="display: inline-block; width: 70px; height: 70px; position: relative;">
+                            <!-- Dibujo simple de QR -->
+                            <div style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border: 1px solid #333; background: repeating-linear-gradient(0deg, transparent, transparent 6px, #333 6px, #333 12px), repeating-linear-gradient(90deg, transparent, transparent 6px, #333 6px, #333 12px);"></div>
+                            <div style="position: absolute; top: 12px; left: 12px; width: 46px; height: 46px; border: 1px solid #333;"></div>
+                            <div style="position: absolute; top: 20px; left: 20px; width: 30px; height: 30px; background-color: #333;"></div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="hash-info">
+                        <strong>Código Hash:</strong> {{ codigo_unico|default:"Generado por SUNAT" }}<br>
+                        <strong>Fecha de emisión:</strong> {{ fecha_emision }}
+                    </div>
+                </div>
+                
+                <!-- OBSERVACIONES debajo del QR -->
+                {% if observaciones %}
+                <div class="observations" style="margin-top: 6px;">
+                    <strong>Observaciones:</strong><br>
+                    {{ observaciones|linebreaksbr }}
+                </div>
+                {% endif %}
+            </div>
+        </td>
+        
+        <!-- COLUMNA DERECHA: RESUMEN DE IMPORTES -->
+        <td width="45%" style="vertical-align: top; border: none; padding: 0 0 0 8px;">
+            <table class="summary-table">
+                <tr>
+                    <td colspan="2" class="summary-header">RESUMEN DE IMPORTES</td>
+                </tr>
+                <tr>
+                    <td class="summary-row summary-label">Op. Gravadas:</td>
+                    <td class="summary-row summary-value">S/ {{ totales.gravada }}</td>
+                </tr>
+                <tr>
+                    <td class="summary-row summary-label">Op. Inafectas:</td>
+                    <td class="summary-row summary-value">S/ {{ total_inafecta|default:"0.00" }}</td>
+                </tr>
+                <tr>
+                    <td class="summary-row summary-label">Op. Exoneradas:</td>
+                    <td class="summary-row summary-value">S/ {{ total_exonerada|default:"0.00" }}</td>
+                </tr>
+                <tr>
+                    <td class="summary-row summary-label">Op. Gratuitas:</td>
+                    <td class="summary-row summary-value">S/ {{ total_gratuita|default:"0.00" }}</td>
+                </tr>
+                <tr>
+                    <td class="summary-row summary-label">Descuentos:</td>
+                    <td class="summary-row summary-value">S/ {{ totales.descuento|default:"0.00" }}</td>
+                </tr>
+                <tr>
+                    <td class="summary-row summary-label">IGV (18%):</td>
+                    <td class="summary-row summary-value">S/ {{ totales.igv }}</td>
+                </tr>
+                <tr>
+                    <td class="summary-total summary-label">IMPORTE TOTAL:</td>
+                    <td class="summary-total summary-value">S/ {{ totales.total }}</td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<div class="clear"></div>
+
+<!-- CONDICIONES DE CRÉDITO -->
+{% if venta_al_credito %}
+<div style="background-color: #e3f2fd; border: 1px solid #bbdefb; border-radius: 3px; padding: 4px; margin: 10px 0 6px 0; font-size: 6pt;">
+    <strong style="color: #1565c0;">Condiciones de Crédito:</strong>
+    <table style="width: 100%; border: none; margin-top: 2px; font-size: 6pt;">
+        {% for cuota in venta_al_credito %}
+        <tr>
+            <td style="border: none; padding: 0px 0; width: 50px;">Cuota {{ cuota.cuota }}:</td>
+            <td style="border: none; padding: 0px 0;">{{ cuota.fecha_de_pago }}</td>
+            <td style="border: none; padding: 0px 0; text-align: right;">S/ {{ cuota.importe|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block footer %}
+<div style="font-size: 5pt; color: #666; text-align: center; border-top: 1px solid #ccc; padding-top: 2px; margin-top: 8px;">
+    <p>
+        <strong>Documento Electrónico generado por sistema.</strong><br>
+        Representación impresa del Comprobante de Pago Electrónico - {{ serie_numero }}
+    </p>
+    <p style="font-size: 5pt;">
+        Fecha de generación: {% now "d/m/Y H:i" %} | 
+        Usuario: {{ user|default:"Sistema" }} |
+        Página <pdf:pagenumber> de <pdf:pagecount>
+    </p>
+</div>
+
+<!-- LEYENDA LEGAL -->
+<div class="legal-text">
+    <strong>LEYENDA:</strong> Esta factura electrónica ha sido generada y autorizada conforme a la Ley N° 28035, Ley de Firmas y Certificados Digitales, y a la Resolución de Superintendencia N° 007-2006/SUNAT. Representación impresa del comprobante de pago electrónico. Para consultar la validez del comprobante, ingresar a https://www.sunat.gob.pe/ o escanear el código QR.
+</div>
+{% endblock %}
