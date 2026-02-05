@@ -237,6 +237,59 @@ body {
     display: inline-block;
 }
 
+/* ===== QR REAL ===== */
+.qr-real {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.qr-image {
+    width: 120px;
+    height: 120px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 5px;
+    background-color: white;
+}
+
+/* Placeholder solo para desarrollo */
+.qr-placeholder {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.qr-demo {
+    width: 120px;
+    height: 120px;
+    border: 1px dashed #ccc;
+    background-color: #f5f5f5;
+    margin: 0 auto 5px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 6pt;
+    color: #666;
+}
+
+.qr-note {
+    font-size: 7pt;
+    color: #999;
+    font-style: italic;
+}
+
+/* Hash code con estilo de código */
+.hash-code {
+    font-family: 'Courier New', monospace;
+    font-size: 6pt;
+    background-color: #f8f9fa;
+    padding: 2px 4px;
+    border-radius: 2px;
+    border: 1px solid #dee2e6;
+    word-break: break-all;
+    display: inline-block;
+    max-width: 100%;
+}
+
 .hash-info {
     font-size: 7pt;
     color: #333;

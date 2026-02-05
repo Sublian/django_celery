@@ -117,22 +117,32 @@
         <td width="55%" style="vertical-align: top; border: none; padding: 0;">
             <div class="qr-left-section">
                 <div class="qr-container">
-                    <div class="qr-placeholder">
-                        {% if qr_data %}
-                        CÓDIGO QR<br>
-                        <small>({{ qr_data|truncatechars:15 }})</small>
-                        {% else %}
-                        <div style="display: inline-block; width: 70px; height: 70px; position: relative;">
-                            <!-- Dibujo simple de QR -->
-                            <div style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border: 1px solid #333; background: repeating-linear-gradient(0deg, transparent, transparent 6px, #333 6px, #333 12px), repeating-linear-gradient(90deg, transparent, transparent 6px, #333 6px, #333 12px);"></div>
-                            <div style="position: absolute; top: 12px; left: 12px; width: 46px; height: 46px; border: 1px solid #333;"></div>
-                            <div style="position: absolute; top: 20px; left: 20px; width: 30px; height: 30px; background-color: #333;"></div>
-                        </div>
-                        {% endif %}
+                    <!-- QR REAL como imagen base64 -->
+                    {% if tiene_qr_real %}
+                    <div class="qr-real">
+                        <img src="data:image/png;base64,{{ qr_image_base64 }}" 
+                             alt="Código QR Factura Electrónica" 
+                             class="qr-image">
                     </div>
+                    {% else %}
+                    <!-- Placeholder solo para desarrollo -->
+                    <div class="qr-placeholder">
+                        <div class="qr-demo">
+                            <!-- Dibujo simple de QR (solo en desarrollo) -->
+                        </div>
+                        <div class="qr-note">[QR PENDIENTE - NubeFact]</div>
+                    </div>
+                    {% endif %}
                     
+                    <!-- CÓDIGO HASH (REQUERIDO POR SUNAT) -->
                     <div class="hash-info">
-                        <strong>Código Hash:</strong> {{ codigo_unico|default:"Generado por SUNAT" }}<br>
+                        {% if codigo_hash %}
+                        <strong>Código Hash SUNAT:</strong><br>
+                        <code class="hash-code">{{ codigo_hash|truncatechars:40 }}</code>
+                        {% else %}
+                        <strong>Código Hash:</strong> Generado por SUNAT
+                        {% endif %}
+                        <br>
                         <strong>Fecha de emisión:</strong> {{ fecha_emision }}
                     </div>
                 </div>

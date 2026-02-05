@@ -7,6 +7,7 @@ from django.conf import settings
 import os
 from io import BytesIO
 import qrcode
+import base64
 from django.conf import settings
 import json
 import asyncio
@@ -60,7 +61,8 @@ class InvoicePDFGenerator(BasePDFGenerator):
             paginated_items.append(items[i:i + ITEMS_PER_PAGE])
         
         # Generar QR si hay datos
-        self.qr_data = self._generate_qr_data()
+        qr_image_base64 = self._generate_qr_data()
+        codigo_hash = self.invoice_data.get('codigo_hash', '')
         
         return {
             'serie_numero': f"{self.invoice_data.get('serie')}-{self.invoice_data.get('numero')}",
@@ -93,15 +95,53 @@ class InvoicePDFGenerator(BasePDFGenerator):
     def _generate_qr_data(self):
         """Genera datos para el código QR"""
         # Datos para el QR según SUNAT
+        cadena_qr = self.invoice_data.get('cadena_para_codigo_qr', '')
+        
+        if cadena_qr:
+            # Generar QR como imagen
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=6,  # Tamaño de los cuadrados del QR
+                border=2,    # Borde del QR
+            )
+            qr.add_data(cadena_qr)
+            qr.make(fit=True)
+            
+            # Crear imagen del QR
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Convertir a base64 para incluir en HTML
+            buffer = BytesIO()
+            img.save(buffer, format="PNG")
+            qr_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+            return qr_base64  # Devuelve la imagen en base64
+        else:
+            # Si no hay cadena, usar placeholder o generar con datos básicos
+            return self._generate_qr_fallback()
+        
+    def _generate_qr_fallback(self):
+        """Genera QR con datos básicos si no viene de NubeFact"""
         qr_info = {
-            'ruc_emisor': settings.COMPANY_RUC,  # Configurar en settings
+            'ruc_emisor': self.invoice_data.get('ruc_emisor', settings.COMPANY_RUC),
             'tipo_doc': self.invoice_data.get('tipo_de_comprobante'),
             'serie': self.invoice_data.get('serie'),
             'numero': self.invoice_data.get('numero'),
             'monto_total': self.invoice_data.get('total'),
             'fecha_emision': self.invoice_data.get('fecha_de_emision'),
         }
-        return json.dumps(qr_info)
+        # Crear cadena similar al formato NubeFact
+        cadena = f"{qr_info['ruc_emisor']}|{qr_info['tipo_doc']}|{qr_info['serie']}|{qr_info['numero']}|{qr_info['monto_total']}|{qr_info['fecha_emision']}"
+        
+        qr = qrcode.QRCode(version=1, box_size=6, border=2)
+        qr.add_data(cadena)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        return base64.b64encode(buffer.getvalue()).decode('utf-8')
     
     def _get_moneda_display(self):
         """Convierte código de moneda a texto"""

@@ -14,6 +14,13 @@ django.setup()
 from shared.utils.pdf.invoice_generator import InvoicePDFGenerator
 
 # Datos de prueba similares a tu JSON de factura
+nubefact_response = {
+    "cadena_para_codigo_qr": "20607403903 | 01 | F001 | 027657 | 73.08 | 479.08 | 02/08/2023 | 6 | 20503682118 | pbvmKKKJ8w20nJ7uLrSoD6PvfM0ZU321WKoI5xUf3nA= |",
+    "codigo_hash": "pbvmKKKJ8w20nJ7uLrSoD6PvfM0ZU321WKoI5xUf3nA=",
+    "aceptada_por_sunat": True,
+    # ... otros campos ...
+}
+
 test_data = {
         'serie': 'F001',
         'numero': 91501,
@@ -271,124 +278,18 @@ test_data = {
             'subtotal': 1000.0,
             'total': 1180.0,
             'codigo_producto_sunat': '81112101'
-        },
-        {
-            'unidad_de_medida': 'ZZ',
-            'codigo': 'TEST002',
-            'descripcion': 'OTRO SERVICIO DE PRUEBA',
-            'cantidad': 1.0,
-            'valor_unitario': 1000.0,
-            'precio_unitario': 1180.0,
-            'subtotal': 1000.0,
-            'total': 1180.0,
-            'codigo_producto_sunat': '81112101'
-        },
-        {
-            'unidad_de_medida': 'ZZ',
-            'codigo': 'TEST002',
-            'descripcion': 'OTRO SERVICIO DE PRUEBA',
-            'cantidad': 1.0,
-            'valor_unitario': 1000.0,
-            'precio_unitario': 1180.0,
-            'subtotal': 1000.0,
-            'total': 1180.0,
-            'codigo_producto_sunat': '81112101'
-        },
-        {
-            'unidad_de_medida': 'ZZ',
-            'codigo': 'TEST002',
-            'descripcion': 'OTRO SERVICIO DE PRUEBA',
-            'cantidad': 1.0,
-            'valor_unitario': 1000.0,
-            'precio_unitario': 1180.0,
-            'subtotal': 1000.0,
-            'total': 1180.0,
-            'codigo_producto_sunat': '81112101'
-        },
-        {
-            'unidad_de_medida': 'ZZ',
-            'codigo': 'TEST002',
-            'descripcion': 'OTRO SERVICIO DE PRUEBA',
-            'cantidad': 1.0,
-            'valor_unitario': 1000.0,
-            'precio_unitario': 1180.0,
-            'subtotal': 1000.0,
-            'total': 1180.0,
-            'codigo_producto_sunat': '81112101'
-        },
-        {
-            'unidad_de_medida': 'ZZ',
-            'codigo': 'TEST002',
-            'descripcion': 'OTRO SERVICIO DE PRUEBA',
-            'cantidad': 1.0,
-            'valor_unitario': 1000.0,
-            'precio_unitario': 1180.0,
-            'subtotal': 1000.0,
-            'total': 1180.0,
-            'codigo_producto_sunat': '81112101'
-        },
-        {
-            'unidad_de_medida': 'ZZ',
-            'codigo': 'TEST002',
-            'descripcion': 'OTRO SERVICIO DE PRUEBA',
-            'cantidad': 1.0,
-            'valor_unitario': 1000.0,
-            'precio_unitario': 1180.0,
-            'subtotal': 1000.0,
-            'total': 1180.0,
-            'codigo_producto_sunat': '81112101'
-        },
-        {
-            'unidad_de_medida': 'ZZ',
-            'codigo': 'TEST002',
-            'descripcion': 'OTRO SERVICIO DE PRUEBA',
-            'cantidad': 1.0,
-            'valor_unitario': 1000.0,
-            'precio_unitario': 1180.0,
-            'subtotal': 1000.0,
-            'total': 1180.0,
-            'codigo_producto_sunat': '81112101'
-        },
-        {
-            'unidad_de_medida': 'ZZ',
-            'codigo': 'TEST002',
-            'descripcion': 'OTRO SERVICIO DE PRUEBA',
-            'cantidad': 1.0,
-            'valor_unitario': 1000.0,
-            'precio_unitario': 1180.0,
-            'subtotal': 1000.0,
-            'total': 1180.0,
-            'codigo_producto_sunat': '81112101'
-        },
-        {
-            'unidad_de_medida': 'ZZ',
-            'codigo': 'TEST002',
-            'descripcion': 'OTRO SERVICIO DE PRUEBA',
-            'cantidad': 1.0,
-            'valor_unitario': 1000.0,
-            'precio_unitario': 1180.0,
-            'subtotal': 1000.0,
-            'total': 1180.0,
-            'codigo_producto_sunat': '81112101'
-        },
-        {
-            'unidad_de_medida': 'ZZ',
-            'codigo': 'TEST002',
-            'descripcion': 'OTRO SERVICIO DE PRUEBA',
-            'cantidad': 1.0,
-            'valor_unitario': 1000.0,
-            'precio_unitario': 1180.0,
-            'subtotal': 1000.0,
-            'total': 1180.0,
-            'codigo_producto_sunat': '81112101'
         }
-                  ]
+                  ],
+        **nubefact_response # Incluir datos de la respuesta de Nubefact
     }
 
 generator = InvoicePDFGenerator(test_data)
 pdf_bytes = generator.generate_sync()
 
-with open("test_factura_weasyprint.pdf", "wb") as f:
+with open("test_factura_weasyprint_qr.pdf", "wb") as f:
     f.write(pdf_bytes)
 
 print("✅ PDF generado con WeasyPrint. Verifica la paginación.")
+print("✅ PDF generado con QR real")
+print("   - Código Hash:", nubefact_response["codigo_hash"][:30] + "...")
+print("   - Cadena QR:", nubefact_response["cadena_para_codigo_qr"][:50] + "...")

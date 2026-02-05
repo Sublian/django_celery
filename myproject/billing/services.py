@@ -27,7 +27,8 @@ class InvoiceService:
             # 2. Actualizar datos con respuesta de Nubefact
             invoice_data.update({
                 'codigo_unico': nubefact_response.get('codigo_hash'),
-                'qr_url': nubefact_response.get('qr_url'),
+                'qr_url': nubefact_response.get('cadena_para_codigo_qr'),
+                'xml_url': nubefact_response.get('enlace_del_xml'),
                 'enlace_del_pdf': nubefact_response.get('enlace_del_pdf'),
                 'sunat_response': nubefact_response 
             })
