@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "easy_pdf",
+    "django_weasyprint",
 ]
 
 MIDDLEWARE = [

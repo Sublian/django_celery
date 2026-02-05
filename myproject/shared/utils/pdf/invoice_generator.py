@@ -1,7 +1,10 @@
 # apps/shared/utils/pdf/invoice_generator.py
 from .base_generator import BasePDFGenerator
 from django.template.loader import render_to_string
-from xhtml2pdf import pisa
+# from xhtml2pdf import pisa
+from weasyprint import HTML, CSS
+from django.conf import settings
+import os
 from io import BytesIO
 import qrcode
 from django.conf import settings
@@ -47,6 +50,15 @@ class InvoicePDFGenerator(BasePDFGenerator):
         total_igv = float(self.invoice_data.get('total_igv', 0))
         total = float(self.invoice_data.get('total', 0))
         
+        # Obtener items y dividirlos en páginas
+        items = self.invoice_data.get('items', [])
+        
+        # Paginación: dividir items en grupos de 10
+        ITEMS_PER_PAGE = 10
+        paginated_items = []
+        for i in range(0, len(items), ITEMS_PER_PAGE):
+            paginated_items.append(items[i:i + ITEMS_PER_PAGE])
+        
         # Generar QR si hay datos
         self.qr_data = self._generate_qr_data()
         
@@ -57,8 +69,15 @@ class InvoicePDFGenerator(BasePDFGenerator):
             'direccion_cliente': self.invoice_data.get('cliente_direccion'),
             'fecha_emision': self.invoice_data.get('fecha_de_emision'),
             'fecha_vencimiento': self.invoice_data.get('fecha_de_vencimiento'),
+            
+            # Items paginados
+            'paginated_items': paginated_items,  # Lista de listas, cada una con máximo 10 items
+            'total_pages': len(paginated_items),  # Número total de páginas de items
+            
+            
             'moneda': self._get_moneda_display(),
-            'items': self.invoice_data.get('items', []),
+            # 'items': self.invoice_data.get('items', []),
+            'items': items,  # Mantener la lista completa para cálculos, pero usar paginated_items en el template
             'totales': {
                 'descuento': f"{total_descuento:.2f}",
                 'gravada': f"{total_gravada:.2f}",
@@ -100,14 +119,22 @@ class InvoicePDFGenerator(BasePDFGenerator):
         }
     
     def generate_pdf(self, html_content):
-        """Implementación concreta usando xhtml2pdf"""
-        result = BytesIO()
-        pdf = pisa.pisaDocument(
-            BytesIO(html_content.encode("UTF-8")),
-            result,
-            encoding='UTF-8'
-        )
+        """Implementación con WeasyPrint"""
+        # 1. Crear objeto HTML con codificación UTF-8
+        html_obj = HTML(string=html_content)
         
-        if not pdf.err:
-            return result.getvalue()
-        raise Exception(f"Error al generar PDF: {pdf.err}")
+        # 2. Opcional: Añadir CSS específico para impresión/paginación
+        # Ruta a un archivo CSS estático en tu proyecto Django
+        css_path = os.path.join(settings.BASE_DIR, 'static', 'css', 'factura.css')
+        css = CSS(filename=css_path)
+        
+        # También puedes combinar múltiples archivos CSS:
+        # css2 = CSS(filename=os.path.join(settings.BASE_DIR, 'static', 'css', 'print.css'))
+        
+        # 3. Generar PDF
+        try:
+            pdf_bytes = html_obj.write_pdf(stylesheets=[css])    # , css2
+            return pdf_bytes
+        except Exception as e:
+            print(f"[DEBUG] Primeros 500 chars del HTML: {html_content[:500]}...")
+            raise Exception(f"Error al generar PDF con WeasyPrint: {str(e)}")
