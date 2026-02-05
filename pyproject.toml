@@ -30,5 +30,6 @@ dependencies = [
     "django-easy-pdf>=0.1.1",
     "weasyprint>=68.0",
     "qrcode>=8.2",
+    "django-weasyprint>=2.4.0",
 ]
 
