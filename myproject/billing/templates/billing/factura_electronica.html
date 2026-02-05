@@ -17,12 +17,12 @@
 
 <!-- SECCIÓN DE INFORMACIÓN DUAL COMPACTA -->
 <div class="info-section">
-    <table width="100%" style="border-collapse: collapse;">
+    <table width="100%">
         <tr>
-            <!-- COLUMNA IZQUIERDA: Dirección de Facturación -->
-            <td width="50%" style="vertical-align: top; padding-right: 8px;">
+<!-- COLUMNA IZQUIERDA: Dirección de Facturación -->
+            <td width="48%" class="info-column-left">
                 <div class="info-title">Dirección De Facturación:</div>
-                <div style="line-height: 1.2;">
+                <div class="info-content">
                     <strong>{{ nombre_comercial|default:cliente }}</strong><br>
                     {{ direccion_cliente }}<br>
                     Celular: {{ celular|default:"N/A" }}<br>
@@ -30,33 +30,38 @@
                 </div>
             </td>
             
-            <!-- COLUMNA DERECHA: Datos de Emisión en 2 columnas -->
-            <td width="50%" style="vertical-align: top; border: none;">
+            <!-- SEPARADOR VERTICAL (nuevo) -->
+            <td width="4%" class="vertical-separator">
+                <div class="separator-line"></div>
+            </td>
+            
+            <!-- COLUMNA DERECHA: Datos de Emisión -->
+            <td width="48%" class="info-column-right">
                 <div class="info-title">Datos de Emisión:</div>
-                <table width="100%" style="border-collapse: collapse; font-size: 7pt; border: 0;">
+                <table class="info-subtable">
                     <tr>
-                        <td style="text-align: right; padding: 0px 3px 0px 0; width: 50%;">Fecha Emisión:</td>
-                        <td style="padding: 0px 0; width: 50%;">{{ fecha_emision }}</td>
+                        <td class="info-label">Fecha Emisión:</td>
+                        <td class="info-value">{{ fecha_emision }}</td>
                     </tr>
                     <tr>
-                        <td style="text-align: right; padding: 0px 3px 0px 0;"># Pedido:</td>
-                        <td style="padding: 0px 0;">{{ identificador|default:"N/A" }}</td>
+                        <td class="info-label"># Pedido:</td>
+                        <td class="info-value">{{ identificador|default:"N/A" }}</td>
                     </tr>
                     <tr>
-                        <td style="text-align: right; padding: 0px 3px 0px 0;">Forma De Pago:</td>
-                        <td style="padding: 0px 0;">{{ metodo_pago|default:condiciones_pago|default:"Contado" }}</td>
+                        <td class="info-label">Forma De Pago:</td>
+                        <td class="info-value">{{ metodo_pago|default:condiciones_pago|default:"Contado" }}</td>
                     </tr>
                     <tr>
-                        <td style="text-align: right; padding: 0px 3px 0px 0;">F.Vencimiento:</td>
-                        <td style="padding: 0px 0;">{{ fecha_vencimiento|default:"N/A" }}</td>
+                        <td class="info-label">F.Vencimiento:</td>
+                        <td class="info-value">{{ fecha_vencimiento|default:"N/A" }}</td>
                     </tr>
                     <tr>
-                        <td style="text-align: right; padding: 0px 3px 0px 0;">Periodo:</td>
-                        <td style="padding: 0px 0;">{{ periodo|default:"N/A" }}</td>
+                        <td class="info-label">Periodo:</td>
+                        <td class="info-value">{{ periodo|default:"N/A" }}</td>
                     </tr>
                     <tr>
-                        <td style="text-align: right; padding: 0px 3px 0px 0;">O/C:</td>
-                        <td style="padding: 0px 0;">{{ otros|default:"N/A" }}</td>
+                        <td class="info-label">O/C:</td>
+                        <td class="info-value">{{ otros|default:"N/A" }}</td>
                     </tr>
                 </table>
             </td>
@@ -65,7 +70,7 @@
 </div>
 
 <!-- DETALLE DE PRODUCTOS/SERVICIOS -->
-<div class="items-table-container ">
+<div class="items-table-container">
     <table class="items-table">
         <thead>
             <tr>
@@ -98,28 +103,6 @@
                 <td class="text-right">S/ {{ item.subtotal|floatformat:2 }}</td>
             </tr>
             
-            <!-- Forzar nueva página después de cierta cantidad de items -->
-            {% if forloop.counter|divisibleby:10 and not forloop.last %}
-            <tr style="page-break-before: always;">
-                
-                <td colspan="7" style="border: none; padding: 0;">
-                    <!-- Encabezado repetido en nueva página -->
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                        <thead>
-                            <tr>
-                                <th width="5%">It</th>
-                                <th width="40%" class="text-left">Descripción</th>
-                                <th width="8%">Cant.</th>
-                                <th width="10%">Unidad</th>
-                                <th width="12%" class="text-right">P.Unitario</th>
-                                <th width="10%" class="text-right">Impuesto</th>
-                                <th width="15%" class="text-right">Precio</th>
-                            </tr>
-                        </thead>
-                    </table>
-                </td>
-            </tr>
-            {% endif %}
             {% endfor %}
         </tbody>
     </table>

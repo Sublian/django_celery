@@ -160,6 +160,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),  # Asegúrate que esta línea existe
+]    
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -281,3 +284,4 @@ for doc_type, path_template in DOCUMENT_STORAGE['STRUCTURE'].items():
     )
     full_path = os.path.join(DOCUMENT_STORAGE['BASE_DIR'], path)
     os.makedirs(full_path, exist_ok=True)
+    

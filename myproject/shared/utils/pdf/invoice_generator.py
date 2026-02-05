@@ -125,8 +125,16 @@ class InvoicePDFGenerator(BasePDFGenerator):
         
         # 2. Opcional: Añadir CSS específico para impresión/paginación
         # Ruta a un archivo CSS estático en tu proyecto Django
-        css_path = os.path.join(settings.BASE_DIR, 'static', 'css', 'factura.css')
-        css = CSS(filename=css_path)
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        css_path = os.path.join(base_dir, 'static', 'css', 'factura.css')
+        # css_path = os.path.join(settings.BASE_DIR, 'static', 'css', 'factura.css')
+        if not os.path.exists(css_path):
+            print(f"[DEBUG] CSS no encontrado en: {css_path}")
+            # Usar CSS por defecto si no existe
+            css = CSS(string='@page { size: A4; margin: 1.5cm; }')
+        else:
+            print(f"[DEBUG] CSS cargado desde: {css_path}")
+            css = CSS(filename=css_path)
         
         # También puedes combinar múltiples archivos CSS:
         # css2 = CSS(filename=os.path.join(settings.BASE_DIR, 'static', 'css', 'print.css'))
