@@ -33,7 +33,7 @@ class BasePDFGenerator(ABC):
         return self.generate_pdf(html)
     
     async def generate_async(self):
-        """Genera PDF de manera asíncrona"""
+        """Genera PDF de manera asíncrona con weasyprint en un hilo separado"""
         html = self.render_html()
         loop = asyncio.get_event_loop()
         

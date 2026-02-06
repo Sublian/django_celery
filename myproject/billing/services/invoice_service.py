@@ -42,7 +42,7 @@ class InvoiceService:
                     settings.PDF_TEMPLATES['invoice']
                 )
                 pdf_generator = InvoicePDFGenerator(invoice_data, template_name)
-                pdf_content = await self.pdf_generator.generate_async()
+                pdf_content = await pdf_generator.generate_async()
             
              # 4. Guardar en disco si se solicita
             storage_result = None
