@@ -133,11 +133,20 @@ class InvoicePDFGenerator(BasePDFGenerator):
             "tipo_doc": self.invoice_data.get("tipo_de_comprobante"),
             "serie": self.invoice_data.get("serie"),
             "numero": self.invoice_data.get("numero"),
+            "igv": self.invoice_data.get("total_igv"),
             "monto_total": self.invoice_data.get("total"),
             "fecha_emision": self.invoice_data.get("fecha_de_emision"),
+            "ruc_receptor": self.invoice_data.get("cliente_numero_de_documento"),
+            "cliente_tipo_de_documento": self.invoice_data.get("cliente_tipo_de_documento"),
         }
+        anio, mes, dia = qr_info['fecha_emision'].split('-')
+        fecha_final = f"{dia}/{mes}/{anio}"
         # Crear cadena similar al formato NubeFact
-        cadena = f"{qr_info['ruc_emisor']}|{qr_info['tipo_doc']}|{qr_info['serie']}|{qr_info['numero']}|{qr_info['monto_total']}|{qr_info['fecha_emision']}"
+        cadena = f"""{qr_info['ruc_emisor']}|{qr_info['tipo_doc']}|
+            {qr_info['serie']}|{qr_info['numero']}|{qr_info['igv']}|
+            {qr_info['monto_total']}|{fecha_final}|
+            {qr_info['cliente_tipo_de_documento']}|{qr_info['ruc_receptor']}"""
+        print(f"[DEBUG] Generando QR con datos: {cadena}")
 
         qr = qrcode.QRCode(version=1, box_size=6, border=2)
         qr.add_data(cadena)
