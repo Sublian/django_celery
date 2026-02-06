@@ -32,8 +32,8 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 
 from .migo_service import MigoAPIService
-from .cache_service import APICacheService
-from ..models import ApiEndpoint, ApiCallLog, ApiBatchRequest
+from ..cache_service import APICacheService
+from ...models import ApiEndpoint, ApiCallLog, ApiBatchRequest
 
 logger = logging.getLogger(__name__)
 

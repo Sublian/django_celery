@@ -9,10 +9,10 @@ from django.db import transaction
 from django.conf import settings
 from django.utils import timezone
 
-from .cache_service import APICacheService
+from ..cache_service import APICacheService
 from billing.models import Partner
-from ..models import ApiService, ApiEndpoint, ApiCallLog, ApiRateLimit, ApiBatchRequest
-from ..exceptions import (
+from ...models import ApiService, ApiEndpoint, ApiCallLog, ApiRateLimit, ApiBatchRequest
+from ...exceptions import (
     APIError,
     RateLimitExceededError,
     AuthenticationError,

@@ -28,7 +28,7 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture
 def migo_service():
     """Fixture que proporciona instancia de MigoAPIServiceAsync."""
-    from api_service.services.migo_service_async import MigoAPIServiceAsync
+    from api_service.services.migo.migo_service_async import MigoAPIServiceAsync
     service = MigoAPIServiceAsync()
     yield service
     # Cleanup
@@ -37,7 +37,7 @@ def migo_service():
 @pytest.fixture
 def async_service_with_mock():
     """Fixture que proporciona servicio con cliente HTTP mockeado (sync fixture)."""
-    from api_service.services.migo_service_async import MigoAPIServiceAsync
+    from api_service.services.migo.migo_service_async import MigoAPIServiceAsync
     
     service = MigoAPIServiceAsync()
     service.client = AsyncMock()
@@ -57,14 +57,14 @@ class TestMigoAPIServiceAsyncInit:
     
     def test_init_custom_timeout(self):
         """Verificar inicialización con timeout personalizado."""
-        from api_service.services.migo_service_async import MigoAPIServiceAsync
+        from api_service.services.migo.migo_service_async import MigoAPIServiceAsync
         service = MigoAPIServiceAsync(timeout=60)
         assert service.timeout == 60
     
     @pytest.mark.asyncio
     async def test_context_manager_entry_exit(self):
         """Verificar que context manager crea y cierra cliente HTTP."""
-        from api_service.services.migo_service_async import MigoAPIServiceAsync
+        from api_service.services.migo.migo_service_async import MigoAPIServiceAsync
         
         async with MigoAPIServiceAsync() as service:
             assert service.client is not None
@@ -491,7 +491,7 @@ class TestHelperFunctions:
     @pytest.mark.asyncio
     async def test_run_async_function(self):
         """Prueba de run_async() bridge function."""
-        from api_service.services.migo_service_async import run_async
+        from api_service.services.migo.migo_service_async import run_async
         
         async def async_func():
             return "resultado"
@@ -502,7 +502,7 @@ class TestHelperFunctions:
     @pytest.mark.asyncio
     async def test_batch_query_function(self):
         """Prueba de batch_query() helper."""
-        from api_service.services.migo_service_async import batch_query
+        from api_service.services.migo.migo_service_async import batch_query
         
         async def mock_query(item):
             await asyncio.sleep(0.01)
@@ -530,7 +530,7 @@ class TestIntegration:
         if not os.getenv('APIMIGO_TOKEN'):
             pytest.skip("APIMIGO_TOKEN no configurado")
         
-        from api_service.services.migo_service_async import MigoAPIServiceAsync
+        from api_service.services.migo.migo_service_async import MigoAPIServiceAsync
         
         async with MigoAPIServiceAsync() as service:
             # Usar RUC conocido en pruebas
@@ -546,7 +546,7 @@ class TestIntegration:
         if not os.getenv('APIMIGO_TOKEN'):
             pytest.skip("APIMIGO_TOKEN no configurado")
         
-        from api_service.services.migo_service_async import MigoAPIServiceAsync
+        from api_service.services.migo.migo_service_async import MigoAPIServiceAsync
         
         rucs = ['20100038146', '20123456789', '20345678901']
         

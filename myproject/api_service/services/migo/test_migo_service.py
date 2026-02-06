@@ -28,7 +28,7 @@ from django.test import TestCase
 from django.utils import timezone
 from django.core.cache import cache
 
-from api_service.services.migo_service import MigoAPIService
+from api_service.services.migo.migo_service import MigoAPIService
 from api_service.models import ApiService, ApiEndpoint
 
 
@@ -932,16 +932,16 @@ def test_print_summary(migo_service):
     print("="*70)
     print("""
   # Ejecutar todas las pruebas
-  pytest api_service/services/test_migo_service.py -v -s
+  pytest api_service/services/migo/test_migo_service.py -v -s
   
   # Ejecutar prueba específica
-  pytest api_service/services/test_migo_service.py::test_migo_service_initialization -v -s
+  pytest api_service/services/migo/test_migo_service.py::test_migo_service_initialization -v -s
   
   # Ejecutar con cobertura
-  pytest api_service/services/test_migo_service.py --cov=api_service.services.migo_service -v
+  pytest api_service/services/migo/test_migo_service.py --cov=api_service.services.migo_service -v
   
   # Ejecutar sin output verboso
-  pytest api_service/services/test_migo_service.py -q
+  pytest api_service/services/migo/test_migo_service.py -q
     """)
     
     print("="*70)
