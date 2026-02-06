@@ -1,4 +1,5 @@
 import asyncio
+import json
 import time
 import logging
 from typing import Any, Optional, Tuple
@@ -173,7 +174,11 @@ class NubefactServiceAsync(ABC):
             logger.warning(f"Error logging API call: {e}")
 
     async def send_request(
-        self, endpoint_name: str, data: Any, method: str = "POST", batch_request=None
+        self, endpoint_name: str, 
+        data: Any, 
+        method: str = "POST", 
+        batch_request=None, 
+        caller_context: str = None
     ) -> dict:
         # Ensure async init has been called
         if not self._initialized:
@@ -210,15 +215,50 @@ class NubefactServiceAsync(ABC):
             else:
                 resp = await client.request(method.upper(), url, json=validated_data)
         except httpx.RequestError as exc:
+            duration_ms = int((time.time() - start) * 1000)
+            await self._log_api_call_async(
+                endpoint_name=endpoint_name,
+                status_code=0,  # No response
+                duration_ms=duration_ms,
+                request_data=validated_data,
+                response_data={'error': str(exc)},
+                called_from=getattr(batch_request, 'called_from', 'send_request')
+            )
             raise NubefactAPIError(str(exc))
 
         duration_ms = int((time.time() - start) * 1000)
         result = self._handle_response_simple(resp)
 
-        # Log and update rate limit in background (fire-and-forget)
+        # Log successful request with COMPLETE data
         asyncio.create_task(self._update_rate_limit_async(endpoint_name))
+        
+        # Get called_from context - this is the NEW PART
+        called_from = None
+        if caller_context:
+            called_from = caller_context
+        elif batch_request:
+            called_from = getattr(batch_request, 'called_from', 'batch')
+        else:
+            # Try to get caller information from stack
+            import inspect
+            try:
+                frame = inspect.currentframe()
+                caller_frame = frame.f_back if frame else None
+                if caller_frame:
+                    called_from = f"{caller_frame.f_code.co_name}:{caller_frame.f_lineno}"
+            except:
+                called_from = 'unknown'
+
+        # Log with ALL data
         asyncio.create_task(
-            self._log_api_call_async(endpoint_name, resp.status_code, duration_ms)
+            self._log_api_call_async(
+                endpoint_name=endpoint_name,
+                status_code=resp.status_code,
+                duration_ms=duration_ms,
+                request_data=validated_data,  # ✅ Ahora se guarda
+                response_data=result,         # ✅ Ahora se guarda
+                called_from=called_from       # ✅ Ahora se guarda
+            )
         )
 
         return result
@@ -261,30 +301,92 @@ class NubefactServiceAsync(ABC):
             logger.warning(f"Error updating rate limit async: {e}")
 
     async def _log_api_call_async(
-        self,
-        endpoint_name: str,
-        status_code: int,
-        response_time_ms: int,
-        error: str = None,
+        self, 
+        endpoint_name: str, 
+        status_code: int, 
+        duration_ms: int,
+        request_data: dict = None,
+        response_data: dict = None,
+        called_from: str = None
     ) -> None:
         """Wrapper asincrónico para logging."""
         try:
+            # Get endpoint object for service association
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                self._executor,
-                self._log_api_call_sync,
-                endpoint_name,
-                status_code,
-                response_time_ms,
-                error,
+            endpoint_obj = await loop.run_in_executor(
+                self._executor, self._get_endpoint_sync, endpoint_name
             )
+            
+            if not endpoint_obj:
+                logger.warning(f"Cannot log API call: endpoint {endpoint_name} not found")
+                return
+            
+            # Prepare log data
+            log_data = {
+                'service': endpoint_obj.service,
+                'endpoint': endpoint_obj,
+                'status_code': status_code,
+                'duration_ms': duration_ms,
+                'request_data': request_data if request_data else {},
+                'response_data': response_data if response_data else {},
+                'called_from': called_from if called_from else 'unknown',
+                'success': 200 <= status_code < 300
+            }
+            
+            # Save via executor to avoid sync DB operations in async context
+            await loop.run_in_executor(
+                self._executor, 
+                self._save_api_log_sync, 
+                log_data
+            )
+            
         except Exception as e:
-            logger.warning(f"Error logging API call async: {e}")
-
-    async def generar_comprobante(self, payload: dict, batch_request=None) -> dict:
+            logger.error(f"Failed to log API call: {str(e)}")
+    async def generar_comprobante(self, payload: dict, batch_request=None, caller_context: str = None) -> dict:
+        """
+        Genera comprobante con tracking de contexto
+        
+        Args:
+            payload: Datos del comprobante
+            caller_context: Quién está llamando (para logging)
+        """
+        # Extraer metadata si existe
+        metadata = payload.pop('_metadata', {}) if '_metadata' in payload else {}
+        
+        # Usar caller_context explícito o metadata
+        final_caller = caller_context or metadata.get('called_from', 'unknown')
+        
         return await self.send_request(
-            "generar_comprobante", payload, method="POST", batch_request=batch_request
+            "generar_comprobante", 
+            payload, method="POST", 
+            batch_request=batch_request, 
+            caller_context=final_caller
         )
+        
+    def _save_api_log_sync(self, log_data: dict) -> None:
+        """
+        Synchronous method to save API log to database.
+        """
+        try:
+            from api_service.models import ApiCallLog
+            
+            # Truncate long data for database fields
+            request_str = json.dumps(log_data['request_data'], ensure_ascii=False)[:2000]
+            response_str = json.dumps(log_data['response_data'], ensure_ascii=False)[:2000]
+            
+            ApiCallLog.objects.create(
+                service=log_data['service'],
+                endpoint=log_data['endpoint'],
+                status_code=log_data['status_code'],
+                duration_ms=log_data['duration_ms'],
+                request_data=request_str,
+                response_data=response_str,
+                called_from=log_data['called_from'],
+                status='SUCCESS' if log_data['success'] else 'FAILED'
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to save API log to DB: {str(e)}")
 
     async def consultar_comprobante(self, numero: str, batch_request=None) -> dict:
         return await self.send_request(

@@ -71,6 +71,7 @@ try:
                 "valor_unitario": 1000.0,
                 "precio_unitario": 1180.0,
                 "subtotal": 1000.0,
+                "igv": 180.0,
                 "total": 1180.0,
                 "codigo_producto_sunat": "81112101",
             }
