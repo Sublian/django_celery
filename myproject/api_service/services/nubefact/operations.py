@@ -2,6 +2,7 @@
 from .client import NubefactClient
 from .schemas import ComprobanteParaEnvio
 
+
 def emitir_comprobante(datos_comprobante: dict) -> dict:
     """
     Función principal para emitir un comprobante electrónico.

@@ -8,13 +8,13 @@ import shutil
 
 project_dir = os.path.dirname(os.path.abspath(__file__))
 
-print("="*60)
+print("=" * 60)
 print("QUICK FIX FOR TEMPLATE ISSUE")
-print("="*60)
+print("=" * 60)
 
 # 1. Copiar base_pdf.html a billing/templates/billing/
-source = os.path.join(project_dir, 'shared/utils/pdf/templates/base_pdf.html')
-destination = os.path.join(project_dir, 'billing/templates/billing/base_pdf.html')
+source = os.path.join(project_dir, "shared/utils/pdf/templates/base_pdf.html")
+destination = os.path.join(project_dir, "billing/templates/billing/base_pdf.html")
 
 if os.path.exists(source):
     shutil.copy2(source, destination)
@@ -22,9 +22,9 @@ if os.path.exists(source):
     print(f"    To: {destination}")
 else:
     print(f"❌ Source not found: {source}")
-    
+
     # Crear un base_pdf.html básico
-    basic_base = '''<!DOCTYPE html>
+    basic_base = """<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -57,47 +57,52 @@ else:
         {% endblock %}
     </div>
 </body>
-</html>'''
-    
-    with open(destination, 'w', encoding='utf-8') as f:
+</html>"""
+
+    with open(destination, "w", encoding="utf-8") as f:
         f.write(basic_base)
     print(f"✅ Created basic base_pdf.html at: {destination}")
 
 # 2. Actualizar factura_electronica.html para usar la nueva ruta
-factura_path = os.path.join(project_dir, 'billing/templates/billing/factura_electronica.html')
+factura_path = os.path.join(
+    project_dir, "billing/templates/billing/factura_electronica.html"
+)
 if os.path.exists(factura_path):
-    with open(factura_path, 'r', encoding='utf-8') as f:
+    with open(factura_path, "r", encoding="utf-8") as f:
         content = f.read()
-    
+
     # Reemplazar la ruta de extends
-    old_extends = 'shared/utils/pdf/templates/base_pdf.html'
-    new_extends = 'billing/base_pdf.html'
-    
+    old_extends = "shared/utils/pdf/templates/base_pdf.html"
+    new_extends = "billing/base_pdf.html"
+
     if old_extends in content:
         content = content.replace(old_extends, new_extends)
-        with open(factura_path, 'w', encoding='utf-8') as f:
+        with open(factura_path, "w", encoding="utf-8") as f:
             f.write(content)
         print(f"✅ Updated factura_electronica.html to use: {new_extends}")
     else:
         print(f"⚠️  factura_electronica.html doesn't extend {old_extends}")
-        
+
         # Verificar qué está extendiendo
         import re
+
         match = re.search(r'\{% extends "([^"]+)"', content)
         if match:
             print(f"   Currently extends: {match.group(1)}")
             print(f"   Changing to: {new_extends}")
-            content = re.sub(r'\{% extends "[^"]+"', f'{{% extends "{new_extends}" %}}', content)
-            with open(factura_path, 'w', encoding='utf-8') as f:
+            content = re.sub(
+                r'\{% extends "[^"]+"', f'{{% extends "{new_extends}" %}}', content
+            )
+            with open(factura_path, "w", encoding="utf-8") as f:
                 f.write(content)
             print(f"✅ Updated extends path")
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("TESTING THE FIX")
-print("="*60)
+print("=" * 60)
 
 # 3. Probar la solución
-test_script = '''
+test_script = """
 import os
 import sys
 import django
@@ -132,24 +137,24 @@ try:
     
 except Exception as e:
     print(f"❌ Error: {e}")
-'''
+"""
 
 # Guardar y ejecutar test
-test_path = os.path.join(project_dir, 'test_fix.py')
-with open(test_path, 'w', encoding='utf-8') as f:
+test_path = os.path.join(project_dir, "test_fix.py")
+with open(test_path, "w", encoding="utf-8") as f:
     f.write(test_script)
 
 print(f"📄 Created test script: {test_path}")
 print("\nRunning test...")
-print("-"*40)
+print("-" * 40)
 
-os.system(f'python {test_path}')
+os.system(f"python {test_path}")
 
 # Limpiar
 os.remove(test_path)
 print(f"\n✅ Cleaned up test script")
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("FINAL STEP: Test PDF generation")
-print("="*60)
+print("=" * 60)
 print("Run: python test_simple_pdf.py")

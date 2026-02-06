@@ -25,10 +25,24 @@ async def run_stress(total: int = 50, concurrency: int = 10, delay: float = 0.0)
                 try:
                     res = await svc.generar_comprobante(payload)
                     duration = time.time() - start
-                    results.append({"index": i, "success": True, "response": res, "duration": duration})
+                    results.append(
+                        {
+                            "index": i,
+                            "success": True,
+                            "response": res,
+                            "duration": duration,
+                        }
+                    )
                 except Exception as e:
                     duration = time.time() - start
-                    results.append({"index": i, "success": False, "error": str(e), "duration": duration})
+                    results.append(
+                        {
+                            "index": i,
+                            "success": False,
+                            "error": str(e),
+                            "duration": duration,
+                        }
+                    )
             if delay:
                 await asyncio.sleep(delay)
 
@@ -42,10 +56,18 @@ async def run_stress(total: int = 50, concurrency: int = 10, delay: float = 0.0)
         "results": results,
     }
 
-    with open("api_service/tests/stress_results_async.json", "w", encoding="utf-8") as f:
+    with open(
+        "api_service/tests/stress_results_async.json", "w", encoding="utf-8"
+    ) as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print("Stress test finished:", summary["successes"], "successes", summary["failures"], "failures")
+    print(
+        "Stress test finished:",
+        summary["successes"],
+        "successes",
+        summary["failures"],
+        "failures",
+    )
 
 
 if __name__ == "__main__":
@@ -57,4 +79,6 @@ if __name__ == "__main__":
     parser.add_argument("--delay", type=float, default=0.0)
     args = parser.parse_args()
 
-    asyncio.run(run_stress(total=args.total, concurrency=args.concurrency, delay=args.delay))
+    asyncio.run(
+        run_stress(total=args.total, concurrency=args.concurrency, delay=args.delay)
+    )

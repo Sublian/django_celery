@@ -527,7 +527,9 @@ def test_todos_endpoints():
                                     print(f"   🔍 RUCs no habilitados:")
                                     for item in analisis["no_habilitados_facturacion"][
                                         "items"
-                                    ][:3]:  # Mostrar primeros 3
+                                    ][
+                                        :3
+                                    ]:  # Mostrar primeros 3
                                         print(
                                             f"      • {item['ruc']}: {item['razon_social'][:30]}... - Motivos: {', '.join(item['motivos'])}"
                                         )
@@ -1024,9 +1026,7 @@ def main():
             estado = (
                 "🟢"
                 if log.status == "SUCCESS"
-                else "🔴"
-                if log.status == "FAILED"
-                else "🟡"
+                else "🔴" if log.status == "FAILED" else "🟡"
             )
             print(
                 f"{estado} {log.endpoint.name if log.endpoint else 'N/A'} - {log.status} - {log.created_at.time()}"

@@ -56,12 +56,16 @@ TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [
-            BASE_DIR / "templates",              # Directorio global de templates
-            BASE_DIR / 'billing' / 'templates',  # Templates de billing app
-            BASE_DIR / 'shared' / 'utils' / 'pdf' / 'templates',  # Templates base para PDFs
-            BASE_DIR / 'shared',  # Directorio shared completo
+            BASE_DIR / "templates",  # Directorio global de templates
+            BASE_DIR / "billing" / "templates",  # Templates de billing app
+            BASE_DIR
+            / "shared"
+            / "utils"
+            / "pdf"
+            / "templates",  # Templates base para PDFs
+            BASE_DIR / "shared",  # Directorio shared completo
         ],  # <-- aquí se indica la carpeta 'templates' del proyecto
-        "APP_DIRS": True,   # Esto busca en app_name/templates/
+        "APP_DIRS": True,  # Esto busca en app_name/templates/
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.debug",
@@ -161,8 +165,8 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),  # Asegúrate que esta línea existe
-]    
+    os.path.join(BASE_DIR, "static"),  # Asegúrate que esta línea existe
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -219,11 +223,11 @@ LOGGING = {
 }
 
 CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         # 'LOCATION': '127.0.0.1:11211',  # Puerto default de Memcached
-        'LOCATION': 'unique-snowflake',
-        'TIMEOUT': 3600,  # 1 hora por defecto
+        "LOCATION": "unique-snowflake",
+        "TIMEOUT": 3600,  # 1 hora por defecto
         # 'OPTIONS': {
         #     'no_delay': True,
         #     'ignore_exc': True,
@@ -236,52 +240,50 @@ CACHES = {
 
 ############################### PDF CONFIG
 # Configuración de empresa
-COMPANY_NAME = os.getenv('COMPANY_NAME', 'MI EMPRESA S.A.C.')
-COMPANY_RUC = os.getenv('COMPANY_RUC', '20123456789')  # <-- ESTE FALTA
-COMPANY_ADDRESS = os.getenv('COMPANY_ADDRESS', 'Av. Principal 123, Lima')
-COMPANY_PHONE = os.getenv('COMPANY_PHONE', '(01) 123-4567')
-COMPANY_EMAIL = os.getenv('COMPANY_EMAIL', 'contacto@empresa.com')
+COMPANY_NAME = os.getenv("COMPANY_NAME", "MI EMPRESA S.A.C.")
+COMPANY_RUC = os.getenv("COMPANY_RUC", "20123456789")  # <-- ESTE FALTA
+COMPANY_ADDRESS = os.getenv("COMPANY_ADDRESS", "Av. Principal 123, Lima")
+COMPANY_PHONE = os.getenv("COMPANY_PHONE", "(01) 123-4567")
+COMPANY_EMAIL = os.getenv("COMPANY_EMAIL", "contacto@empresa.com")
 
 # Templates para PDFs
 PDF_TEMPLATES = {
-    'invoice': 'billing/factura_electronica.html',
-    'invoice_custom': 'billing/plantilla_personalizada.html',
-    'receipt': 'billing/boleta_electronica.html',  # Crear después
-    'quote': 'billing/cotizacion.html',            # Crear después
+    "invoice": "billing/factura_electronica.html",
+    "invoice_custom": "billing/plantilla_personalizada.html",
+    "receipt": "billing/boleta_electronica.html",  # Crear después
+    "quote": "billing/cotizacion.html",  # Crear después
 }
 
 # Opcional: Configuración de rutas base
-PDF_BASE_TEMPLATE = 'shared/utils/pdf/templates/base_pdf.html'
+PDF_BASE_TEMPLATE = "shared/utils/pdf/templates/base_pdf.html"
 
 # Configuración de almacenamiento de documentos
 DOCUMENT_STORAGE = {
-    'BASE_DIR': os.path.join(BASE_DIR, 'file_store'),
-    'STRUCTURE': {
-        'invoices': 'billing/invoices/{year}/{month}/',
-        'receipts': 'billing/receipts/{year}/{month}/',
-        'quotes': 'billing/quotes/{year}/{month}/',
-        'credit_notes': 'billing/credit_notes/{year}/{month}/',
-        'temporary': 'temp/{date}/',
+    "BASE_DIR": os.path.join(BASE_DIR, "file_store"),
+    "STRUCTURE": {
+        "invoices": "billing/invoices/{year}/{month}/",
+        "receipts": "billing/receipts/{year}/{month}/",
+        "quotes": "billing/quotes/{year}/{month}/",
+        "credit_notes": "billing/credit_notes/{year}/{month}/",
+        "temporary": "temp/{date}/",
     },
-    'RETENTION_DAYS': {
-        'invoices': 365 * 10,      # 10 años
-        'receipts': 365 * 10,      # 10 años
-        'quotes': 365,             # 1 año
-        'credit_notes': 365 * 10,  # 10 años
-        'temporary': 7,            # 7 días
-    }
+    "RETENTION_DAYS": {
+        "invoices": 365 * 10,  # 10 años
+        "receipts": 365 * 10,  # 10 años
+        "quotes": 365,  # 1 año
+        "credit_notes": 365 * 10,  # 10 años
+        "temporary": 7,  # 7 días
+    },
 }
 
 # Crear directorios de almacenamiento
 import os
 from datetime import datetime
-for doc_type, path_template in DOCUMENT_STORAGE['STRUCTURE'].items():
+
+for doc_type, path_template in DOCUMENT_STORAGE["STRUCTURE"].items():
     now = datetime.now()
     path = path_template.format(
-        year=now.strftime('%Y'),
-        month=now.strftime('%m'),
-        date=now.strftime('%Y%m%d')
+        year=now.strftime("%Y"), month=now.strftime("%m"), date=now.strftime("%Y%m%d")
     )
-    full_path = os.path.join(DOCUMENT_STORAGE['BASE_DIR'], path)
+    full_path = os.path.join(DOCUMENT_STORAGE["BASE_DIR"], path)
     os.makedirs(full_path, exist_ok=True)
-    

@@ -2,6 +2,7 @@
 Prueba de integración REAL para NubefactServiceAsync.
 Ejecutar: python test_nubefact_integration_async.py desde el directorio myproject/
 """
+
 import os
 import sys
 import django
@@ -34,25 +35,30 @@ async def run_integration_test():
     print("=" * 70)
     print("PRUEBA DE INTEGRACION ASYNC - NubefactServiceAsync")
     print("=" * 70)
-    
+
     # Querys a BD deben ser sync (envueltas con sync_to_async)
     initial_log_count = await sync_to_async(ApiCallLog.objects.count)()
     print(f"\n[LOG] Registros iniciales de ApiCallLog: {initial_log_count}")
-    
+
     print("\n[INIT] Inicializando NubefactServiceAsync...")
-    
+
     # La inicialización de NubefactServiceAsync hace llamadas sync a BD
     # Envolver el __init__ con sync_to_async
     async def create_service():
         def _init():
             return NubefactServiceAsync()
+
         return await sync_to_async(_init)()
-    
+
     try:
         svc = await create_service()
         try:
             print(f"[CONFIG] Base URL: {svc.base_url}")
-            print(f"[CONFIG] Auth Token: {svc.auth_token[:20]}..." if svc.auth_token else "N/A")
+            print(
+                f"[CONFIG] Auth Token: {svc.auth_token[:20]}..."
+                if svc.auth_token
+                else "N/A"
+            )
             REF_NUMBER = 91430
             # Payload de prueba (estructura compatible con API Nubefact)
             payload = {
@@ -76,54 +82,58 @@ async def run_integration_test():
                         "cantidad": 1,
                         "precio_unitario": 100.00,
                         "descuento": 0,
-                        "total": 118.00
+                        "total": 118.00,
                     }
-                ]
+                ],
             }
-            
+
             print("\n[REQUEST] Enviando generar_comprobante async...")
             print(f"[PAYLOAD] Número: {payload['numero']}")
             print(f"[PAYLOAD] Total: {payload['total']}")
-            
+
             start = time.time()
             try:
                 # Envolver send_request async en sync_to_async para evitar SynchronousOnlyOperation
                 async def send_and_log():
                     return await svc.generar_comprobante(payload)
-                
+
                 response = await send_and_log()
                 duration = time.time() - start
-                
+
                 print(f"\n[RESPONSE OK] Completado en {duration:.2f}s")
-                print(f"[RESPONSE] Datos: {json.dumps(response, indent=2, default=str)[:800]}")
-                
+                print(
+                    f"[RESPONSE] Datos: {json.dumps(response, indent=2, default=str)[:800]}"
+                )
+
             except Exception as e:
                 duration = time.time() - start
                 print(f"\n[RESPONSE ERROR] Falló en {duration:.2f}s")
                 print(f"[ERROR] {type(e).__name__}: {str(e)}")
         finally:
             # Cerrar cliente async
-            if hasattr(svc, '_client') and svc._client:
+            if hasattr(svc, "_client") and svc._client:
                 await svc._client.aclose()
-    
+
     except Exception as e:
         print(f"[INIT_ERROR] {str(e)}")
         return
-    
+
     final_log_count = await sync_to_async(ApiCallLog.objects.count)()
     new_logs = final_log_count - initial_log_count
     print(f"\n[LOG] Registros finales de ApiCallLog: {final_log_count}")
     print(f"[LOG] Nuevos registros: {new_logs}")
-    
+
     if new_logs > 0:
+
         async def get_latest():
-            return ApiCallLog.objects.order_by('-id').first()
+            return ApiCallLog.objects.order_by("-id").first()
+
         latest_log = await sync_to_async(get_latest)()
         print(f"\n[LATEST_LOG] ID: {latest_log.id}")
         print(f"[LATEST_LOG] Status: {latest_log.status}")
         print(f"[LATEST_LOG] Duration: {latest_log.duration_ms}ms")
         print(f"[LATEST_LOG] Error: {latest_log.error_message or 'None'}")
-    
+
     print("\n" + "=" * 70)
     print("FIN PRUEBA DE INTEGRACION ASYNC")
     print("=" * 70)
@@ -131,4 +141,3 @@ async def run_integration_test():
 
 if __name__ == "__main__":
     asyncio.run(run_integration_test())
-

@@ -10,7 +10,7 @@ import sys
 project_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Template básico para factura
-factura_template = '''{% extends "shared/utils/pdf/templates/base_pdf.html" %}
+factura_template = """{% extends "shared/utils/pdf/templates/base_pdf.html" %}
 
 {% block title %}Factura Electrónica {{ serie_numero }}{% endblock %}
 
@@ -91,10 +91,10 @@ factura_template = '''{% extends "shared/utils/pdf/templates/base_pdf.html" %}
     <p>Documento generado electrónicamente</p>
 </div>
 {% endblock %}
-'''
+"""
 
 # Template básico personalizado
-plantilla_personalizada = '''{% extends "shared/utils/pdf/templates/base_pdf.html" %}
+plantilla_personalizada = """{% extends "shared/utils/pdf/templates/base_pdf.html" %}
 
 {% block title %}Factura {{ serie_numero }} - Personalizada{% endblock %}
 
@@ -120,10 +120,10 @@ plantilla_personalizada = '''{% extends "shared/utils/pdf/templates/base_pdf.htm
     <p>✨ Plantilla personalizada ✨</p>
 </div>
 {% endblock %}
-'''
+"""
 
 # Template base
-base_template = '''<!DOCTYPE html>
+base_template = """<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -192,24 +192,35 @@ base_template = '''<!DOCTYPE html>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
-'''
+"""
 
 # Directorios a crear
 directories = [
-    os.path.join(project_dir, 'billing/templates/billing'),
-    os.path.join(project_dir, 'shared/utils/pdf/templates'),
+    os.path.join(project_dir, "billing/templates/billing"),
+    os.path.join(project_dir, "shared/utils/pdf/templates"),
 ]
 
 # Archivos a crear
 files_to_create = [
-    (os.path.join(project_dir, 'billing/templates/billing/factura_electronica.html'), factura_template),
-    (os.path.join(project_dir, 'billing/templates/billing/plantilla_personalizada.html'), plantilla_personalizada),
-    (os.path.join(project_dir, 'shared/utils/pdf/templates/base_pdf.html'), base_template),
+    (
+        os.path.join(project_dir, "billing/templates/billing/factura_electronica.html"),
+        factura_template,
+    ),
+    (
+        os.path.join(
+            project_dir, "billing/templates/billing/plantilla_personalizada.html"
+        ),
+        plantilla_personalizada,
+    ),
+    (
+        os.path.join(project_dir, "shared/utils/pdf/templates/base_pdf.html"),
+        base_template,
+    ),
 ]
 
-print("="*60)
+print("=" * 60)
 print("CREATING TEMPLATE FILES")
-print("="*60)
+print("=" * 60)
 
 # Crear directorios
 for directory in directories:
@@ -222,13 +233,13 @@ for directory in directories:
 # Crear archivos
 for file_path, content in files_to_create:
     if not os.path.exists(file_path):
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
         print(f"✅ Created file: {file_path}")
     else:
         print(f"📄 File exists: {file_path}")
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("TEMPLATES READY")
-print("="*60)
+print("=" * 60)
 print("Now run: python test_template_fix.py")

@@ -2,6 +2,7 @@
 Configuración de pytest para Django
 Este archivo se ejecuta automáticamente antes de los tests
 """
+
 import os
 import sys
 import django
@@ -12,7 +13,7 @@ django_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(django_dir))
 
 # Configurar Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myproject.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "myproject.settings")
 
 try:
     django.setup()
@@ -40,10 +41,10 @@ def cache_service():
     Fixture que proporciona una instancia limpia de APICacheService
     """
     from api_service.services.cache_service import APICacheService
-    
+
     cache = APICacheService()
     yield cache
-    
+
     # Cleanup: limpiar cache después de cada test
     try:
         cache.clear()
@@ -58,19 +59,19 @@ def api_service_migo():
     Esto permite ejecutar tests incluso si el servicio no está en BD
     """
     from api_service.models import ApiService, ApiEndpoint
-    
+
     # Intentar obtener el servicio MIGO existente
     service = ApiService.objects.filter(service_type="MIGO").first()
-    
+
     if not service:
         # Si no existe, crear uno de prueba
         service = ApiService.objects.create(
             service_type="MIGO",
             base_url="https://api.migo.pe",
             auth_token="test_token_migo",
-            is_active=True
+            is_active=True,
         )
-        
+
         # Crear endpoints comunes para MIGO
         endpoints_config = [
             ("consulta_cuenta", "/api/v1/account", 30),
@@ -82,18 +83,14 @@ def api_service_migo():
             ("tipo_cambio_rango", "/api/v1/exchange", 30),
             ("representantes_legales", "/api/v1/ruc/representantes-legales", 30),
         ]
-        
+
         for name, path, timeout in endpoints_config:
             ApiEndpoint.objects.get_or_create(
                 service=service,
                 name=name,
-                defaults={
-                    "path": path,
-                    "timeout": timeout,
-                    "method": "POST"
-                }
+                defaults={"path": path, "timeout": timeout, "method": "POST"},
             )
-    
+
     yield service
-    
+
     # No eliminar el servicio después del test, es compartido

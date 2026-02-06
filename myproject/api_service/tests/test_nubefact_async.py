@@ -9,7 +9,9 @@ from api_service.services.nubefact.nubefact_service_async import NubefactService
 
 @pytest.mark.asyncio
 async def test_init_and_token_formatting(monkeypatch):
-    mock_service = SimpleNamespace(base_url="https://api.nubefact.test", auth_token="abc123")
+    mock_service = SimpleNamespace(
+        base_url="https://api.nubefact.test", auth_token="abc123"
+    )
 
     # Patch BaseAPIService.__init__ behavior by creating instance and overriding attributes
     svc = object.__new__(NubefactServiceAsync)
@@ -17,10 +19,15 @@ async def test_init_and_token_formatting(monkeypatch):
     svc.token = svc.auth_token
     svc._client = None
     svc.timeout = NubefactServiceAsync.DEFAULT_TIMEOUT
-    svc._validate_and_format_token = lambda t: (t if t.startswith("Bearer ") else f"Bearer {t}")
+    svc._validate_and_format_token = lambda t: (
+        t if t.startswith("Bearer ") else f"Bearer {t}"
+    )
 
     headers = svc._build_headers()
-    assert headers["Authorization"].startswith("Bearer ") or headers["Authorization"] == "Bearer abc123"
+    assert (
+        headers["Authorization"].startswith("Bearer ")
+        or headers["Authorization"] == "Bearer abc123"
+    )
 
 
 @pytest.mark.asyncio
@@ -28,10 +35,14 @@ async def test_send_request_success(monkeypatch):
     mock_endpoint = SimpleNamespace(path="/v1/generar", name="generar_comprobante")
 
     svc = object.__new__(NubefactServiceAsync)
-    svc.service = SimpleNamespace(base_url="https://api.nubefact.test", auth_token="abc123")
+    svc.service = SimpleNamespace(
+        base_url="https://api.nubefact.test", auth_token="abc123"
+    )
     svc._client = None
     svc.timeout = NubefactServiceAsync.DEFAULT_TIMEOUT
-    svc._validate_and_format_token = lambda t: (t if t.startswith("Bearer ") else f"Bearer {t}")
+    svc._validate_and_format_token = lambda t: (
+        t if t.startswith("Bearer ") else f"Bearer {t}"
+    )
     svc._initialized = True
     svc._executor = None  # Not used in this test
 
@@ -61,10 +72,14 @@ async def test_send_request_http_error(monkeypatch):
     mock_endpoint = SimpleNamespace(path="/v1/generar", name="generar_comprobante")
 
     svc = object.__new__(NubefactServiceAsync)
-    svc.service = SimpleNamespace(base_url="https://api.nubefact.test", auth_token="abc123")
+    svc.service = SimpleNamespace(
+        base_url="https://api.nubefact.test", auth_token="abc123"
+    )
     svc._client = None
     svc.timeout = NubefactServiceAsync.DEFAULT_TIMEOUT
-    svc._validate_and_format_token = lambda t: (t if t.startswith("Bearer ") else f"Bearer {t}")
+    svc._validate_and_format_token = lambda t: (
+        t if t.startswith("Bearer ") else f"Bearer {t}"
+    )
     svc._initialized = True
     svc._executor = None  # Not used in this test
     monkeypatch.setattr(svc, "_get_endpoint_sync", lambda name: mock_endpoint)

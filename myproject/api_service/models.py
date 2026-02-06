@@ -186,7 +186,7 @@ class ApiEndpoint(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(1000)],
         help_text="Límite personalizado para este endpoint (sobrescribe el del servicio)",
     )
-    
+
     timeout = models.IntegerField(
         null=True,
         blank=True,
@@ -575,14 +575,14 @@ class ApiRateLimit(models.Model):
         """
         now = timezone.now()
 
-        time_diff = (now - self.minute_window_start)
-        
+        time_diff = now - self.minute_window_start
+
         # Reiniciar contador si ha pasado más de 1 minuto
         if time_diff.total_seconds() >= 60:
             self.current_count = 0
             self.minute_window_start = now
-            self.save(update_fields=['current_count', 'minute_window_start'])
-        
+            self.save(update_fields=["current_count", "minute_window_start"])
+
         return self.current_count < self.get_limit()
 
     def increment_count(self):

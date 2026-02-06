@@ -8,20 +8,26 @@ import re
 
 project_dir = os.path.dirname(os.path.abspath(__file__))
 
-print("="*60)
+print("=" * 60)
 print("FIXING TEMPLATE ISSUES")
-print("="*60)
+print("=" * 60)
 
 # 1. Verificar encoding en base_pdf.html
-base_pdf_path = os.path.join(project_dir, 'billing/templates/billing/base_pdf.html')
+base_pdf_path = os.path.join(project_dir, "billing/templates/billing/base_pdf.html")
 print("\n[1/4] Checking base_pdf.html encoding...")
 
-with open(base_pdf_path, 'r', encoding='utf-8') as f:
+with open(base_pdf_path, "r", encoding="utf-8") as f:
     content = f.read()
 
 encoding_fixes = [
-    (r'<head>', '<head>\n    <meta charset="UTF-8">\n    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>'),
-    (r'<meta charset="UTF-8">\s*<meta charset="UTF-8">', '<meta charset="UTF-8">'),  # Remove duplicates
+    (
+        r"<head>",
+        '<head>\n    <meta charset="UTF-8">\n    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>',
+    ),
+    (
+        r'<meta charset="UTF-8">\s*<meta charset="UTF-8">',
+        '<meta charset="UTF-8">',
+    ),  # Remove duplicates
 ]
 
 fixed_count = 0
@@ -31,46 +37,53 @@ for pattern, replacement in encoding_fixes:
         fixed_count += 1
 
 if fixed_count > 0:
-    with open(base_pdf_path, 'w', encoding='utf-8') as f:
+    with open(base_pdf_path, "w", encoding="utf-8") as f:
         f.write(content)
     print(f"✅ Fixed {fixed_count} encoding issues in base_pdf.html")
 else:
     print("✅ Encoding already correct in base_pdf.html")
 
 # 2. Verificar tablas en factura_electronica.html
-factura_path = os.path.join(project_dir, 'billing/templates/billing/factura_electronica.html')
+factura_path = os.path.join(
+    project_dir, "billing/templates/billing/factura_electronica.html"
+)
 print("\n[2/4] Checking factura_electronica.html tables...")
 
-with open(factura_path, 'r', encoding='utf-8') as f:
+with open(factura_path, "r", encoding="utf-8") as f:
     content = f.read()
 
 # Verificar estructura de tabla
 table_issues = []
 
 # Verificar etiquetas table/tr/td cerradas
-if content.count('<table') != content.count('</table>'):
+if content.count("<table") != content.count("</table>"):
     table_issues.append("Mismatched <table> tags")
-if content.count('<tr') != content.count('</tr>'):
+if content.count("<tr") != content.count("</tr>"):
     table_issues.append("Mismatched <tr> tags")
-if content.count('<td') != content.count('</td>') and content.count('<th') != content.count('</th>'):
+if content.count("<td") != content.count("</td>") and content.count(
+    "<th"
+) != content.count("</th>"):
     table_issues.append("Mismatched <td>/<th> tags")
 
 if table_issues:
     print(f"⚠️  Table issues found: {table_issues}")
-    
+
     # Corregir tabla común
     table_fixes = [
         # Asegurar que las tablas tengan estructura correcta
-        (r'<table>([^<]*)</table>', r'<table>\n<tbody>\n\1\n</tbody>\n</table>'),
-        (r'<table([^>]*)>([^<]*)</table>', r'<table\1>\n<tbody>\n\2\n</tbody>\n</table>'),
+        (r"<table>([^<]*)</table>", r"<table>\n<tbody>\n\1\n</tbody>\n</table>"),
+        (
+            r"<table([^>]*)>([^<]*)</table>",
+            r"<table\1>\n<tbody>\n\2\n</tbody>\n</table>",
+        ),
     ]
-    
+
     for pattern, replacement in table_fixes:
         if re.search(pattern, content):
             content = re.sub(pattern, replacement, content)
             print(f"✅ Applied table fix: {pattern[:50]}...")
-    
-    with open(factura_path, 'w', encoding='utf-8') as f:
+
+    with open(factura_path, "w", encoding="utf-8") as f:
         f.write(content)
 else:
     print("✅ Table structure looks good")
@@ -79,9 +92,9 @@ else:
 print("\n[3/4] Checking for malformed HTML...")
 
 malformed_patterns = [
-    r'<table[^>]*>\s*</table>',  # Tablas vacías
-    r'<td[^>]*>\s*</td>',        # Celdas vacías
-    r'<tr[^>]*>\s*</tr>',        # Filas vacías
+    r"<table[^>]*>\s*</table>",  # Tablas vacías
+    r"<td[^>]*>\s*</td>",  # Celdas vacías
+    r"<tr[^>]*>\s*</tr>",  # Filas vacías
 ]
 
 for pattern in malformed_patterns:
@@ -94,7 +107,7 @@ for pattern in malformed_patterns:
 # 4. Agregar estilos CSS para tablas
 print("\n[4/4] Adding CSS for better table rendering...")
 
-css_to_add = '''
+css_to_add = """
 /* Mejoras para tablas en PDF */
 table.items-table {
     border-collapse: collapse;
@@ -138,32 +151,34 @@ table.items-table tr {
     page-break-inside: avoid;
     page-break-after: auto;
 }
-'''
+"""
 
 # Agregar CSS al template base
-with open(base_pdf_path, 'r', encoding='utf-8') as f:
+with open(base_pdf_path, "r", encoding="utf-8") as f:
     base_content = f.read()
 
-if 'table.items-table' not in base_content:
+if "table.items-table" not in base_content:
     # Buscar donde agregar el CSS
-    if '<style>' in base_content:
+    if "<style>" in base_content:
         # Agregar después del tag <style>
-        base_content = base_content.replace('<style>', f'<style>\n{css_to_add}')
+        base_content = base_content.replace("<style>", f"<style>\n{css_to_add}")
         print("✅ Added table CSS to base_pdf.html")
-    elif '</head>' in base_content:
+    elif "</head>" in base_content:
         # Agregar antes de </head>
-        base_content = base_content.replace('</head>', f'<style>{css_to_add}</style>\n</head>')
+        base_content = base_content.replace(
+            "</head>", f"<style>{css_to_add}</style>\n</head>"
+        )
         print("✅ Added table CSS to head")
-    
-    with open(base_pdf_path, 'w', encoding='utf-8') as f:
+
+    with open(base_pdf_path, "w", encoding="utf-8") as f:
         f.write(base_content)
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("CREATING OPTIMIZED TEMPLATE")
-print("="*60)
+print("=" * 60)
 
 # Crear una versión optimizada del template
-optimized_template = '''{% extends "billing/base_pdf.html" %}
+optimized_template = """{% extends "billing/base_pdf.html" %}
 
 {% block title %}Factura Electrónica {{ serie_numero }}{% endblock %}
 
@@ -383,20 +398,22 @@ optimized_template = '''{% extends "billing/base_pdf.html" %}
     <strong>LEYENDA:</strong> Esta factura electrónica ha sido generada y autorizada conforme a la Ley N° 28035, Ley de Firmas y Certificados Digitales, y a la Resolución de Superintendencia N° 007-2006/SUNAT. Representación impresa del comprobante de pago electrónico. Para consultar la validez del comprobante, ingresar a https://www.sunat.gob.pe/ o escanear el código QR.
 </div>
 {% endblock %}
-'''
+"""
 
 # Guardar template optimizado
-optimized_path = os.path.join(project_dir, 'billing/templates/billing/factura_optimizada.html')
-with open(optimized_path, 'w', encoding='utf-8') as f:
+optimized_path = os.path.join(
+    project_dir, "billing/templates/billing/factura_optimizada.html"
+)
+with open(optimized_path, "w", encoding="utf-8") as f:
     f.write(optimized_template)
 
 print(f"✅ Created optimized template: {optimized_path}")
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("TEST THE FIXED TEMPLATE")
-print("="*60)
+print("=" * 60)
 
-test_code = '''
+test_code = """
 import os
 import sys
 import django
@@ -473,25 +490,25 @@ except Exception as e:
     print(f"❌ Error: {e}")
     import traceback
     traceback.print_exc()
-'''
+"""
 
-test_path = os.path.join(project_dir, 'test_optimized.py')
-with open(test_path, 'w', encoding='utf-8') as f:
+test_path = os.path.join(project_dir, "test_optimized.py")
+with open(test_path, "w", encoding="utf-8") as f:
     f.write(test_code)
 
 print(f"\n📄 Created test script: {test_path}")
 print("Running test...")
-print("-"*40)
+print("-" * 40)
 
-os.system(f'python {test_path}')
+os.system(f"python {test_path}")
 
 # Limpiar
 os.remove(test_path)
 print(f"\n✅ Cleaned up test script")
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("NEXT STEPS")
-print("="*60)
+print("=" * 60)
 print("1. Check the generated PDF: test_optimized.pdf")
 print("2. If it looks good, update your main template")
 print("3. Or use the optimized template by default")

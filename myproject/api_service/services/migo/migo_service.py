@@ -27,18 +27,18 @@ logger = logging.getLogger(__name__)
 class MigoAPIService:
     """
     Cliente específico para APIMIGO con todas sus funcionalidades.
-    
+
     Características:
     - Consultas de RUC, DNI, tipo de cambio, representantes legales
     - Cache integrado (LocMemCache en desarrollo, Memcached en producción)
     - Rate limiting automático
     - Manejo completo de errores
     - Batch processing
-    
+
     El cache se gestiona automáticamente a través de APICacheService.
     Los RUCs válidos se cachean por 1 hora, inválidos por 24 horas.
     """
-    
+
     # Constantes para cache de RUCs inválidos
     INVALID_RUCS_CACHE_KEY = "migo_invalid_rucs"
     INVALID_RUC_TTL_HOURS = 24  # RUCs inválidos se cachean por 24 horas
@@ -49,7 +49,7 @@ class MigoAPIService:
             raise ValueError("Servicio APIMIGO no configurado")
 
         self.token = token or self.service.auth_token
-        self.base_url = self.service.base_url        
+        self.base_url = self.service.base_url
         self.cache_service = APICacheService()
         self.invalid_rucs_cache_key = "invalid_rucs_cache"
 
@@ -84,10 +84,10 @@ class MigoAPIService:
     def _get_endpoint(self, endpoint_name: str) -> Optional[ApiEndpoint]:
         """
         Obtiene la configuración de un endpoint desde la base de datos.
-        
+
         Args:
             endpoint_name: Nombre del endpoint
-            
+
         Returns:
             ApiEndpoint o None si no se encuentra
         """
@@ -95,17 +95,18 @@ class MigoAPIService:
             # Si la inicialización del servicio no se realizó (p.ej. en tests
             # donde evitamos acceso a la BD), devolver un endpoint "ligero"
             # con atributos mínimos para permitir mocking del cliente HTTP.
-            if not getattr(self, 'service', None):
+            if not getattr(self, "service", None):
+
                 class _SimpleEndpoint:
                     pass
+
                 ep = _SimpleEndpoint()
                 ep.path = f"/{endpoint_name}"
-                ep.timeout = getattr(self, 'timeout', 30)
+                ep.timeout = getattr(self, "timeout", 30)
                 return ep
 
             return ApiEndpoint.objects.filter(
-                service=self.service,
-                name=endpoint_name
+                service=self.service, name=endpoint_name
             ).first()
         except Exception as e:
             logger.error(f"Error obteniendo endpoint {endpoint_name}: {str(e)}")
@@ -120,16 +121,16 @@ class MigoAPIService:
             Tuple[bool, float]: (puede_proceder, tiempo_espera_segundos)
         """
         try:
-            if not getattr(self, 'service', None):
+            if not getattr(self, "service", None):
                 return True, 0
-                
+
             endpoint = self._get_endpoint(endpoint_name)
             if endpoint:
                 # Obtener o crear el registro de rate limit para este endpoint
                 rate_limit, created = ApiRateLimit.get_for_service_endpoint(
                     self.service, endpoint
                 )
-                
+
                 # Usar el método can_make_request() del modelo
                 if rate_limit.can_make_request():
                     return True, 0
@@ -143,29 +144,29 @@ class MigoAPIService:
                     return False, wait_seconds
         except Exception as e:
             logger.error(f"Error checking rate limit: {str(e)}")
-        
+
         # Por defecto, permitir la petición si hay error
         return True, 0
-    
+
     def _update_rate_limit(self, endpoint_name: str) -> None:
         """
         Actualiza rate limit después de una llamada.
         Incrementa el contador de peticiones realizadas.
-        
+
         Args:
             endpoint_name: Nombre del endpoint
         """
         try:
-            if not getattr(self, 'service', None):
+            if not getattr(self, "service", None):
                 return
-                
+
             endpoint = self._get_endpoint(endpoint_name)
             if endpoint:
                 # Obtener o crear el registro de rate limit para este endpoint
                 rate_limit, created = ApiRateLimit.get_for_service_endpoint(
                     self.service, endpoint
                 )
-                
+
                 # Usar el método increment_count() del modelo
                 rate_limit.increment_count()
                 logger.debug(
@@ -174,15 +175,22 @@ class MigoAPIService:
                 )
         except Exception as e:
             logger.error(f"Error updating rate limit: {str(e)}")
-    
-    def _log_api_call(self, endpoint_name: str, request_data: dict, 
-                     response_data: dict, status: str, error_message: str = "", 
-                     duration_ms: int = 0, batch_request: ApiBatchRequest = None,
-                     caller_info: str = None) -> None:
+
+    def _log_api_call(
+        self,
+        endpoint_name: str,
+        request_data: dict,
+        response_data: dict,
+        status: str,
+        error_message: str = "",
+        duration_ms: int = 0,
+        batch_request: ApiBatchRequest = None,
+        caller_info: str = None,
+    ) -> None:
         """
         Registra llamada API en base de datos.
         FUNCIÓN EXISTENTE: Mejorada para manejar RUCs inválidos.
-        
+
         Args:
             endpoint_name: Nombre del endpoint
             request_data: Datos de la solicitud
@@ -197,7 +205,7 @@ class MigoAPIService:
             caller_info = self._get_caller_info()
 
         # Si no hay servicio (p.ej. tests que evitan inicializar DB), solo loguear
-        if not getattr(self, 'service', None):
+        if not getattr(self, "service", None):
             logger.debug(
                 f"[API_CALL] {endpoint_name} status={status} duration={duration_ms}ms error={error_message}"
             )
@@ -208,8 +216,8 @@ class MigoAPIService:
 
             # Si es un RUC inválido (404), registrar información adicional
             if status == "FAILED" and "404" in error_message:
-                response_data['invalid_ruc'] = True
-                response_data['invalid_reason'] = "RUC_NO_EXISTE_SUNAT"
+                response_data["invalid_ruc"] = True
+                response_data["invalid_reason"] = "RUC_NO_EXISTE_SUNAT"
 
             ApiCallLog.objects.create(
                 service=self.service,
@@ -218,17 +226,27 @@ class MigoAPIService:
                 status=status,
                 request_data=request_data,
                 response_data=response_data,
-                response_code=response_data.get('status_code', 200) if isinstance(response_data, dict) else 200,
+                response_code=(
+                    response_data.get("status_code", 200)
+                    if isinstance(response_data, dict)
+                    else 200
+                ),
                 error_message=error_message[:500],
                 duration_ms=duration_ms,
-                called_from=caller_info
+                called_from=caller_info,
             )
         except Exception as e:
             logger.error(f"Error logging API call: {str(e)}")
-    
-    def _make_request(self, endpoint_name: str, data: dict = None, method: str = 'POST',
-                     batch_request: ApiBatchRequest = None, retry_count: int = 0, 
-                     max_retries: int = 2) -> Dict[str, Any]:
+
+    def _make_request(
+        self,
+        endpoint_name: str,
+        data: dict = None,
+        method: str = "POST",
+        batch_request: ApiBatchRequest = None,
+        retry_count: int = 0,
+        max_retries: int = 2,
+    ) -> Dict[str, Any]:
         """
         Realiza una petición HTTP a la API Migo.
         FUNCIÓN EXISTENTE: Mantenida con lógica mejorada para RUCs inválidos.
@@ -244,13 +262,13 @@ class MigoAPIService:
         """
         start_time = timezone.now()
         endpoint = self._get_endpoint(endpoint_name)
-        
+
         if not endpoint:
             return {
                 "success": False,
-                "error": f"Endpoint {endpoint_name} no configurado"
+                "error": f"Endpoint {endpoint_name} no configurado",
             }
-        
+
         # Verificar rate limit
         can_proceed, wait_time = self._check_rate_limit(endpoint_name)
         if not can_proceed:
@@ -262,87 +280,87 @@ class MigoAPIService:
                 status="RATE_LIMITED",
                 error_message=error_msg,
                 duration_ms=0,
-                batch_request=batch_request
+                batch_request=batch_request,
             )
             return {"success": False, "error": error_msg}
-        
+
         # Preparar datos de la petición
         request_data = data or {}
-        if 'token' not in request_data:
-            request_data['token'] = self.token
-        
+        if "token" not in request_data:
+            request_data["token"] = self.token
+
         try:
             # Realizar la petición
-            if method.upper() == 'POST':
+            if method.upper() == "POST":
                 response = requests.post(
                     f"{self.base_url}{endpoint.path}",
                     json=request_data,
-                    headers={'Content-Type': 'application/json'},
-                    timeout=endpoint.timeout or 30
+                    headers={"Content-Type": "application/json"},
+                    timeout=endpoint.timeout or 30,
                 )
             else:
                 response = requests.get(
                     f"{self.base_url}{endpoint.path}",
                     params=request_data,
-                    timeout=endpoint.timeout or 30
+                    timeout=endpoint.timeout or 30,
                 )
-            
+
             duration_ms = (timezone.now() - start_time).total_seconds() * 1000
-            
+
             # Procesar respuesta
             if response.status_code == 200:
                 response_data = response.json()
-                
+
                 # Verificar si la respuesta indica RUC inválido
                 if isinstance(response_data, dict):
-                    success = response_data.get('success', True)
-                    
-                    if not success and '404' in str(response_data.get('error', '')):
+                    success = response_data.get("success", True)
+
+                    if not success and "404" in str(response_data.get("error", "")):
                         # RUC no encontrado en SUNAT
-                        response_data['invalid_sunat'] = True
-                
+                        response_data["invalid_sunat"] = True
+
                 self._log_api_call(
                     endpoint_name=endpoint_name,
                     request_data=request_data,
                     response_data=response_data,
                     status="SUCCESS",
                     duration_ms=duration_ms,
-                    batch_request=batch_request
+                    batch_request=batch_request,
                 )
-                
+
                 self._update_rate_limit(endpoint_name)
                 return response_data
-                
+
             elif response.status_code == 404:
                 # RUC no encontrado - Manejo específico mejorado
                 duration_ms = (timezone.now() - start_time).total_seconds() * 1000
-                
+
                 # Intentar obtener mensaje de error del response
                 try:
                     error_data = response.json()
-                    error_msg = error_data.get('error', 'RUC no encontrado en SUNAT')
+                    error_msg = error_data.get("error", "RUC no encontrado en SUNAT")
                 except:
-                    error_msg = 'RUC no encontrado en SUNAT'
-                
+                    error_msg = "RUC no encontrado en SUNAT"
+
                 response_data = {
                     "success": False,
                     "error": error_msg,
                     "status_code": 404,
-                    "invalid_sunat": True  # Flag específico para RUCs inválidos
+                    "invalid_sunat": True,  # Flag específico para RUCs inválidos
                 }
-                
+
                 # Extraer RUC de la solicitud para marcarlo como inválido
                 ruc = None
-                if data and 'ruc' in data:
-                    ruc = data['ruc']
-                elif isinstance(request_data, dict) and 'ruc' in request_data:
-                    ruc = request_data['ruc']
-                
+                if data and "ruc" in data:
+                    ruc = data["ruc"]
+                elif isinstance(request_data, dict) and "ruc" in request_data:
+                    ruc = request_data["ruc"]
+
                 if ruc:
                     # Marcar RUC como inválido en cache
                     self._mark_ruc_as_invalid(ruc, "404_NOT_FOUND")
-                    response_data['ruc'] = ruc
-                
+                    response_data["ruc"] = ruc
+
                 self._log_api_call(
                     endpoint_name=endpoint_name,
                     request_data=request_data,
@@ -350,28 +368,28 @@ class MigoAPIService:
                     status="RUC_INVALID",  # Nuevo estado específico
                     error_message=error_msg,
                     duration_ms=duration_ms,
-                    batch_request=batch_request
+                    batch_request=batch_request,
                 )
-                
+
                 self._update_rate_limit(endpoint_name)
                 return response_data
-                
+
             else:
                 # Otro error HTTP
                 duration_ms = (timezone.now() - start_time).total_seconds() * 1000
-                
+
                 try:
                     error_data = response.json()
                     error_msg = f"Error {response.status_code}: {error_data.get('error', 'Error desconocido')}"
                 except:
                     error_msg = f"Error {response.status_code}: {response.text[:200]}"
-                
+
                 response_data = {
                     "success": False,
                     "error": error_msg,
-                    "status_code": response.status_code
+                    "status_code": response.status_code,
                 }
-                
+
                 self._log_api_call(
                     endpoint_name=endpoint_name,
                     request_data=request_data,
@@ -379,30 +397,33 @@ class MigoAPIService:
                     status="FAILED",
                     error_message=error_msg,
                     duration_ms=duration_ms,
-                    batch_request=batch_request
+                    batch_request=batch_request,
                 )
-                
+
                 # Reintento para errores 5xx o timeout
                 if retry_count < max_retries and response.status_code >= 500:
-                    logger.warning(f"Reintentando {endpoint_name}, intento {retry_count + 1}/{max_retries}")
-                    time.sleep(2 ** retry_count)  # Backoff exponencial
-                    return self._make_request(
-                        endpoint_name, data, method, 
-                        batch_request, retry_count + 1, max_retries
+                    logger.warning(
+                        f"Reintentando {endpoint_name}, intento {retry_count + 1}/{max_retries}"
                     )
-                
+                    time.sleep(2**retry_count)  # Backoff exponencial
+                    return self._make_request(
+                        endpoint_name,
+                        data,
+                        method,
+                        batch_request,
+                        retry_count + 1,
+                        max_retries,
+                    )
+
                 self._update_rate_limit(endpoint_name)
                 return response_data
-                
+
         except RequestException as e:
             duration_ms = (timezone.now() - start_time).total_seconds() * 1000
             error_msg = f"Error de conexión: {str(e)}"
-            
-            response_data = {
-                "success": False,
-                "error": error_msg
-            }
-            
+
+            response_data = {"success": False, "error": error_msg}
+
             self._log_api_call(
                 endpoint_name=endpoint_name,
                 request_data=request_data,
@@ -410,29 +431,36 @@ class MigoAPIService:
                 status="FAILED",
                 error_message=error_msg,
                 duration_ms=duration_ms,
-                batch_request=batch_request
+                batch_request=batch_request,
             )
-            
+
             # Reintento para errores de conexión
             if retry_count < max_retries:
-                logger.warning(f"Reintentando {endpoint_name} por error de conexión, intento {retry_count + 1}/{max_retries}")
-                time.sleep(2 ** retry_count)
-                return self._make_request(
-                    endpoint_name, data, method, 
-                    batch_request, retry_count + 1, max_retries
+                logger.warning(
+                    f"Reintentando {endpoint_name} por error de conexión, intento {retry_count + 1}/{max_retries}"
                 )
-            
+                time.sleep(2**retry_count)
+                return self._make_request(
+                    endpoint_name,
+                    data,
+                    method,
+                    batch_request,
+                    retry_count + 1,
+                    max_retries,
+                )
+
             return response_data
-        
+
     def _get_caller_info(self, depth: int = 3) -> str:
         """
-        Obtiene información del llamador para logging.        
+        Obtiene información del llamador para logging.
         Args:
-            depth: Profundidad del stack trace a analizar            
+            depth: Profundidad del stack trace a analizar
         Returns:
             str: Información del llamador
         """
         import inspect
+
         try:
             frame = inspect.currentframe()
             for _ in range(depth):
@@ -447,140 +475,154 @@ class MigoAPIService:
     def _validate_ruc_format(self, ruc: str) -> Tuple[bool, str]:
         """
         NUEVA FUNCIÓN: Agregada para validación previa.
-        Valida el formato básico de un RUC peruano.        
+        Valida el formato básico de un RUC peruano.
         Args:
-            ruc: Número de RUC a validar            
+            ruc: Número de RUC a validar
         Returns:
             Tuple[bool, str]: (es_válido, mensaje_error)
         """
         if not ruc:
             return False, "RUC vacío"
-        
+
         # Convertir a string si es necesario
         if not isinstance(ruc, str):
             ruc = str(ruc)
-        
+
         # Verificar que sean solo dígitos
         if not ruc.isdigit():
             return False, "RUC debe contener solo dígitos"
-        
+
         # Verificar longitud (11 dígitos para RUC peruano)
         if len(ruc) != 11:
             return False, f"RUC debe tener 11 dígitos, tiene {len(ruc)}"
-                
+
         # Verificar RUCs de prueba conocidos (del dataset problemático)
         rucs_prueba_conocidos = {
-            '20678901234': 'RUC de prueba - secuencia numérica',
-            '20123456789': 'RUC de prueba - secuencia numérica', 
-            '20456789012': 'RUC de prueba - secuencia numérica',
-            '20789012345': 'RUC de prueba - secuencia numérica',
-            '20890123456': 'RUC de prueba - secuencia numérica'
+            "20678901234": "RUC de prueba - secuencia numérica",
+            "20123456789": "RUC de prueba - secuencia numérica",
+            "20456789012": "RUC de prueba - secuencia numérica",
+            "20789012345": "RUC de prueba - secuencia numérica",
+            "20890123456": "RUC de prueba - secuencia numérica",
         }
-        
+
         if ruc in rucs_prueba_conocidos:
             return False, rucs_prueba_conocidos[ruc]
-        
+
         # Verificar patrones sospechosos (todos iguales, secuencias, etc.)
         if len(set(ruc)) == 1:  # Todos los dígitos iguales
             return False, "RUC con patrón inválido (todos dígitos iguales)"
-        
+
         return True, ""
-    
+
     def _is_ruc_marked_invalid(self, ruc: str) -> bool:
         """
         NUEVA FUNCIÓN: Agregada para validación previa.
-        Verifica si un RUC está marcado como inválido en el cache.        
+        Verifica si un RUC está marcado como inválido en el cache.
         Args:
-            ruc: Número de RUC a verificar            
+            ruc: Número de RUC a verificar
         Returns:
             bool: True si el RUC está marcado como inválido
         """
         invalid_rucs = self.cache_service.get(self.INVALID_RUCS_CACHE_KEY, {}) or {}
         return ruc in invalid_rucs
-    
+
     def _mark_ruc_as_invalid(self, ruc: str, reason: str = "NO_EXISTE_SUNAT"):
         """
         NUEVA FUNCIÓN: Agregada para validación previa.
-        Marca un RUC como inválido en el cache.        
+        Marca un RUC como inválido en el cache.
         Args:
             ruc: Número de RUC a marcar como inválido
             reason: Razón por la cual es inválido
         """
         invalid_rucs = self.cache_service.get(self.INVALID_RUCS_CACHE_KEY, {}) or {}
         invalid_rucs[ruc] = {
-            'reason': reason,
-            'timestamp': timezone.now().isoformat(),
-            'ttl_hours': self.INVALID_RUC_TTL_HOURS
+            "reason": reason,
+            "timestamp": timezone.now().isoformat(),
+            "ttl_hours": self.INVALID_RUC_TTL_HOURS,
         }
         self.cache_service.set(
-            self.INVALID_RUCS_CACHE_KEY, 
-            invalid_rucs, 
-            ttl=self.INVALID_RUC_TTL_HOURS * 3600
+            self.INVALID_RUCS_CACHE_KEY,
+            invalid_rucs,
+            ttl=self.INVALID_RUC_TTL_HOURS * 3600,
         )
         logger.info(f"RUC {ruc} marcado como inválido: {reason}")
-        
-    def _update_partner_sunat_status(self, ruc: str, api_response: Dict[str, Any]) -> None:
+
+    def _update_partner_sunat_status(
+        self, ruc: str, api_response: Dict[str, Any]
+    ) -> None:
         """
         NUEVA FUNCIÓN: Para mantener actualizado el estado de partners.
-        Actualiza el estado SUNAT de un partner basado en la respuesta de la API.        
+        Actualiza el estado SUNAT de un partner basado en la respuesta de la API.
         Args:
             ruc: Número de RUC del partner
             api_response: Respuesta de la API Migo
         """
         try:
             # Evitar operaciones de BD cuando el servicio no está inicializado
-            if not getattr(self, 'service', None):
-                logger.debug("_update_partner_sunat_status: servicio no inicializado, omitiendo actualización de partner")
+            if not getattr(self, "service", None):
+                logger.debug(
+                    "_update_partner_sunat_status: servicio no inicializado, omitiendo actualización de partner"
+                )
                 return
             # Buscar partner por RUC o num_document
             partner = Partner.objects.filter(num_document=ruc).first()
-            
+
             if not partner:
                 logger.debug(f"Partner con RUC {ruc} no encontrado en la base de datos")
                 return
-            
+
             with transaction.atomic():
-                is_valid = api_response.get('success', False)
-                
+                is_valid = api_response.get("success", False)
+
                 if not is_valid:
                     # RUC inválido o no encontrado
                     partner.sunat_valid = False
-                    partner.sunat_state = 'NO_VERIFICADO'
-                    partner.sunat_condition = 'NO_VERIFICADO'
-                    
-                    error_msg = api_response.get('error', 'RUC inválido')
-                    
+                    partner.sunat_state = "NO_VERIFICADO"
+                    partner.sunat_condition = "NO_VERIFICADO"
+
+                    error_msg = api_response.get("error", "RUC inválido")
+
                     # Agregar nueva observación manteniendo las anteriores
                     new_comment = f"[{timezone.now().date()}] SUNAT: {error_msg}\n"
                     partner.sunat_comment = new_comment[:1000]  # Limitar longitud
-                    
-                    logger.info(f"Partner {ruc} marcado como inválido en SUNAT: {error_msg}")
-                    
+
+                    logger.info(
+                        f"Partner {ruc} marcado como inválido en SUNAT: {error_msg}"
+                    )
+
                 else:
                     # RUC válido con datos
-                    data = api_response.get('data', {})
+                    data = api_response.get("data", {})
                     partner.sunat_valid = True
-                    partner.sunat_state = data.get('estado_del_contribuyente', 'NO_VERIFICADO')
-                    partner.sunat_condition = data.get('condicion_de_domicilio', 'NO_VERIFICADO')
+                    partner.sunat_state = data.get(
+                        "estado_del_contribuyente", "NO_VERIFICADO"
+                    )
+                    partner.sunat_condition = data.get(
+                        "condicion_de_domicilio", "NO_VERIFICADO"
+                    )
                     partner.sunat_last_check = timezone.now()
-                    
+
                     # Guardar datos de dirección si están disponibles
-                    if 'direccion_simple' in data:
-                        partner.sunat_address = data['direccion_simple'][:500]
-                    if 'ubigeo' in data:
-                        partner.sunat_ubigeo = data['ubigeo'][:6]
-                    
+                    if "direccion_simple" in data:
+                        partner.sunat_address = data["direccion_simple"][:500]
+                    if "ubigeo" in data:
+                        partner.sunat_ubigeo = data["ubigeo"][:6]
+
                     # Agregar observación de verificación exitosa
-                    new_comment = f"[{timezone.now().date()}] SUNAT: Validación exitosa\n"
+                    new_comment = (
+                        f"[{timezone.now().date()}] SUNAT: Validación exitosa\n"
+                    )
                     partner.sunat_comment = new_comment[:1000]
-                    
+
                     logger.info(f"Partner {ruc} actualizado con datos SUNAT válidos")
-                
+
                 partner.save()
-                
+
         except Exception as e:
-            logger.error(f"Error actualizando estado SUNAT para partner {ruc}: {str(e)}")
-         
+            logger.error(
+                f"Error actualizando estado SUNAT para partner {ruc}: {str(e)}"
+            )
+
     # Métodos específicos de APIMIGO
     def consultar_cuenta(self):
         """Consulta información de la cuenta MIGO"""
@@ -590,12 +632,13 @@ class MigoAPIService:
             # endpoint_name_display="Consulta cuenta APIMIGO",
         )
 
-    def consultar_ruc(self, ruc: str, force_refresh: bool = False, 
-                     update_partner: bool = True) -> Dict[str, Any]:
+    def consultar_ruc(
+        self, ruc: str, force_refresh: bool = False, update_partner: bool = True
+    ) -> Dict[str, Any]:
         """
         Consulta individual de RUC con manejo mejorado de RUCs inválidos.
         FUNCIÓN EXISTENTE: Mejorada con validación y cache de inválidos.
-        
+
         Args:
         # Delegate to APICacheService to keep logic centralized
         try:
@@ -604,12 +647,12 @@ class MigoAPIService:
             logger.error(f"Error delegating is_ruc_invalid for {ruc}: {e}")
             return False
             update_partner: Actualizar estado del partner en base de datos
-            
+
         Returns:
             Dict con la respuesta de la API
         """
         start_time = timezone.now()
-        
+
         # 1. Validar formato del RUC antes de cualquier consulta
         is_valid_format, format_error = self._validate_ruc_format(ruc)
         if not is_valid_format:
@@ -618,89 +661,95 @@ class MigoAPIService:
                 "success": False,
                 "error": format_error,
                 "ruc": ruc,
-                "invalid_format": True
+                "invalid_format": True,
             }
-            
+
             self._log_api_call(
                 endpoint_name="consultar_ruc",
                 request_data={"ruc": ruc},
                 response_data=api_response,
                 status="INVALID_FORMAT",
                 error_message=format_error,
-                duration_ms=duration_ms
+                duration_ms=duration_ms,
             )
-            
+
             if update_partner:
                 self._update_partner_sunat_status(ruc, api_response)
-            
+
             return api_response
-        
+
         # 2. Verificar si el RUC está marcado como inválido en cache
         if not force_refresh and self._is_ruc_marked_invalid(ruc):
-            logger.debug(f"RUC {ruc} encontrado en cache de inválidos, omitiendo consulta")
+            logger.debug(
+                f"RUC {ruc} encontrado en cache de inválidos, omitiendo consulta"
+            )
             duration_ms = (timezone.now() - start_time).total_seconds() * 1000
-            
-            invalid_info = self.cache_service.get(self.INVALID_RUCS_CACHE_KEY, {}).get(ruc, {})
+
+            invalid_info = self.cache_service.get(self.INVALID_RUCS_CACHE_KEY, {}).get(
+                ruc, {}
+            )
             api_response = {
                 "success": False,
                 "error": f"RUC marcado como inválido: {invalid_info.get('reason', 'Desconocido')}",
                 "ruc": ruc,
                 "cache_hit": True,
-                "cache_type": "invalid"
+                "cache_type": "invalid",
             }
-            
+
             self._log_api_call(
                 endpoint_name="consultar_ruc",
                 request_data={"ruc": ruc},
                 response_data=api_response,
                 status="CACHE_INVALID",
                 error_message=api_response["error"],
-                duration_ms=duration_ms
+                duration_ms=duration_ms,
             )
-            
+
             if update_partner:
                 self._update_partner_sunat_status(ruc, api_response)
-            
+
             return api_response
-        
+
         # 3. Verificar cache normal (para RUCs válidos)
         if not force_refresh:
-            cache_key = self.cache_service.get_service_cache_key('migo', f"ruc_{ruc}")
+            cache_key = self.cache_service.get_service_cache_key("migo", f"ruc_{ruc}")
             cached_data = self.cache_service.get(cache_key)
             if cached_data:
                 logger.debug(f"Cache hit para RUC {ruc} (válido)")
                 duration_ms = (timezone.now() - start_time).total_seconds() * 1000
                 api_response = {**cached_data, "cache_hit": True, "cache_type": "valid"}
-                
+
                 if update_partner:
                     self._update_partner_sunat_status(ruc, api_response)
-                
+
                 return api_response
-        
+
         # 4. Consultar API usando _make_request existente
         request_data = {"ruc": ruc}
         api_response = self._make_request("consultar_ruc", data=request_data)
-        
+
         # 5. Procesar respuesta
         if api_response.get("success"):
             # RUC válido - guardar en cache normal (use service-scoped key)
-            cache_key = self.cache_service.get_service_cache_key('migo', f"ruc_{ruc}")
-            self.cache_service.set(cache_key, api_response, ttl=self.cache_service.RUC_VALID_TTL)
-            
+            cache_key = self.cache_service.get_service_cache_key("migo", f"ruc_{ruc}")
+            self.cache_service.set(
+                cache_key, api_response, ttl=self.cache_service.RUC_VALID_TTL
+            )
+
             # Actualizar partner
             if update_partner:
                 self._update_partner_sunat_status(ruc, api_response)
-                
+
         elif api_response.get("invalid_sunat"):
             # RUC inválido en SUNAT - ya fue marcado en _make_request
             if update_partner:
                 self._update_partner_sunat_status(ruc, api_response)
-        
+
         return api_response
-    
+
     def consultar_dni(self, dni):
         """Consulta datos de un DNI"""
-        cache_key = self.cache_service.get_service_cache_key('migo', f"dni_{dni}")
+        cache_key = self.cache_service.get_service_cache_key("migo", f"dni_{dni}")
         cached_data = self.cache_service.get(cache_key)
 
         if cached_data:
@@ -711,7 +760,9 @@ class MigoAPIService:
         # Cachear por 24 horas (usar RUC_INVALID_TTL como TTL diario)
         if result.get("success"):
             try:
-                self.cache_service.set(cache_key, result, ttl=self.cache_service.RUC_INVALID_TTL)
+                self.cache_service.set(
+                    cache_key, result, ttl=self.cache_service.RUC_INVALID_TTL
+                )
             except Exception:
                 logger.exception("Error cacheando resultado de DNI")
 
@@ -1357,31 +1408,28 @@ class MigoAPIService:
             )
             raise Exception(error_msg)
 
-    def consultar_ruc_masivo(self, rucs: List[str], batch_size: int = 50,
-                           update_partners: bool = True) -> Dict[str, Any]:
+    def consultar_ruc_masivo(
+        self, rucs: List[str], batch_size: int = 50, update_partners: bool = True
+    ) -> Dict[str, Any]:
         """
         Consulta masiva de RUCs con manejo optimizado de inválidos.
         FUNCIÓN EXISTENTE: Mejorada con filtrado de inválidos y procesamiento por lotes.
-        
+
         Args:
             rucs: Lista de RUCs a consultar
             batch_size: Tamaño de lote para procesamiento
             update_partners: Actualizar estado de partners en base de datos
-            
+
         Returns:
             Dict con resultados consolidados
         """
         if not rucs:
-            return {
-                "success": False,
-                "error": "Lista de RUCs vacía",
-                "total": 0
-            }
-        
+            return {"success": False, "error": "Lista de RUCs vacía", "total": 0}
+
         # Filtrar RUCs únicos
         rucs_unicos = list(set(rucs))
         duplicates_removed = len(rucs) - len(rucs_unicos)
-        
+
         resultados = {
             "success": True,
             "total_rucs": len(rucs),
@@ -1392,53 +1440,54 @@ class MigoAPIService:
             "errores": [],
             "cache_hits": 0,
             "api_calls": 0,
-            "batches_processed": 0
+            "batches_processed": 0,
         }
-        
+
         # Pre-filtrar RUCs con formato inválido
         rucs_a_procesar = []
         rucs_invalidos_formato = []
-        
+
         for ruc in rucs_unicos:
             is_valid_format, format_error = self._validate_ruc_format(ruc)
             if is_valid_format:
                 rucs_a_procesar.append(ruc)
             else:
-                rucs_invalidos_formato.append({
-                    "ruc": ruc,
-                    "error": format_error,
-                    "type": "invalid_format"
-                })
-                resultados["invalidos"].append({
-                    "ruc": ruc,
-                    "error": format_error,
-                    "type": "invalid",
-                    "subtype": "format"
-                })
-        
+                rucs_invalidos_formato.append(
+                    {"ruc": ruc, "error": format_error, "type": "invalid_format"}
+                )
+                resultados["invalidos"].append(
+                    {
+                        "ruc": ruc,
+                        "error": format_error,
+                        "type": "invalid",
+                        "subtype": "format",
+                    }
+                )
+
         # Procesar RUCs válidos en formato
         for i in range(0, len(rucs_a_procesar), batch_size):
-            batch = rucs_a_procesar[i:i + batch_size]
+            batch = rucs_a_procesar[i : i + batch_size]
             resultados["batches_processed"] += 1
-            
-            logger.info(f"Procesando lote {resultados['batches_processed']}: {len(batch)} RUCs")
-            
+
+            logger.info(
+                f"Procesando lote {resultados['batches_processed']}: {len(batch)} RUCs"
+            )
+
             # Consultar lote usando endpoint masivo (si existe) o individualmente
             try:
                 # Intentar consulta masiva
-                request_data = {
-                    "ruc": batch,
-                    "token": self.token
-                }
-                
-                batch_response = self._make_request("consultar_ruc_masivo", data=request_data)
-                
+                request_data = {"ruc": batch, "token": self.token}
+
+                batch_response = self._make_request(
+                    "consultar_ruc_masivo", data=request_data
+                )
+
                 # Procesar respuesta masiva
                 # La API puede devolver:
                 # 1. Una lista directa de diccionarios (nuevo formato)
                 # 2. Un diccionario con "data" que contiene la lista (formato legado)
                 response_data = None
-                
+
                 if isinstance(batch_response, list):
                     # Caso 1: Respuesta es directamente una lista
                     response_data = batch_response
@@ -1446,93 +1495,105 @@ class MigoAPIService:
                     # Caso 2: Respuesta es un diccionario con éxito
                     if isinstance(batch_response.get("data"), list):
                         response_data = batch_response["data"]
-                
+
                 if response_data is not None and isinstance(response_data, list):
                     # Procesar la lista de resultados
                     for item in response_data:
                         if isinstance(item, dict):
                             ruc = item.get("ruc")
                             is_success = item.get("success", False)
-                            
+
                             if is_success:
                                 # RUC válido en SUNAT
-                                resultados["validos"].append({
-                                    "ruc": ruc,
-                                    "data": item
-                                })
-                                
+                                resultados["validos"].append({"ruc": ruc, "data": item})
+
                                 # Actualizar partner si se solicita
                                 if update_partners:
-                                    self._update_partner_sunat_status(ruc, {"success": True, "data": item})
-                                
+                                    self._update_partner_sunat_status(
+                                        ruc, {"success": True, "data": item}
+                                    )
+
                                 # Marcar como válido removiendo del cache de inválidos si existe
                                 if self.cache_service.is_ruc_invalid(ruc):
                                     self.cache_service.remove_invalid_ruc(ruc)
                             else:
                                 # RUC no encontrado o error en SUNAT
-                                resultados["invalidos"].append({
-                                    "ruc": ruc,
-                                    "error": item.get("error", "RUC no encontrado en SUNAT"),
-                                    "type": "invalid",
-                                    "subtype": "sunat"
-                                })
-                                
+                                resultados["invalidos"].append(
+                                    {
+                                        "ruc": ruc,
+                                        "error": item.get(
+                                            "error", "RUC no encontrado en SUNAT"
+                                        ),
+                                        "type": "invalid",
+                                        "subtype": "sunat",
+                                    }
+                                )
+
                                 # Marcar como inválido
                                 self._mark_ruc_as_invalid(ruc, "NO_EXISTE_SUNAT")
-                                
+
                                 # Actualizar partner si se solicita
                                 if update_partners:
-                                    self._update_partner_sunat_status(ruc, {"success": False, "error": item.get("error", "No encontrado")})
+                                    self._update_partner_sunat_status(
+                                        ruc,
+                                        {
+                                            "success": False,
+                                            "error": item.get("error", "No encontrado"),
+                                        },
+                                    )
                         else:
                             # Item no es un diccionario
-                            resultados["errores"].append({
-                                "ruc": "unknown",
-                                "error": "Formato inválido en respuesta",
-                                "type": "error"
-                            })
-                    
+                            resultados["errores"].append(
+                                {
+                                    "ruc": "unknown",
+                                    "error": "Formato inválido en respuesta",
+                                    "type": "error",
+                                }
+                            )
+
                     resultados["api_calls"] += 1
-                    
+
                 elif batch_response.get("success") is False:
                     # API devolvió error general
-                    logger.warning(f"Error en consulta masiva: {batch_response.get('error', 'Error desconocido')}")
-                    # Procesar individualmente como fallback
-                    self._process_batch_individually(
-                        batch, resultados, update_partners
+                    logger.warning(
+                        f"Error en consulta masiva: {batch_response.get('error', 'Error desconocido')}"
                     )
+                    # Procesar individualmente como fallback
+                    self._process_batch_individually(batch, resultados, update_partners)
                 else:
                     # Respuesta inesperada
-                    logger.warning(f"Respuesta inesperada de la API: {type(batch_response)}")
-                    # Procesar individualmente como fallback
-                    self._process_batch_individually(
-                        batch, resultados, update_partners
+                    logger.warning(
+                        f"Respuesta inesperada de la API: {type(batch_response)}"
                     )
-                    
+                    # Procesar individualmente como fallback
+                    self._process_batch_individually(batch, resultados, update_partners)
+
             except Exception as e:
                 logger.error(f"Error procesando lote: {str(e)}")
                 # Procesar individualmente como fallback
-                self._process_batch_individually(
-                    batch, resultados, update_partners
-                )
-        
+                self._process_batch_individually(batch, resultados, update_partners)
+
         # Estadísticas finales
         resultados["total_validos"] = len(resultados["validos"])
         resultados["total_invalidos"] = len(resultados["invalidos"])
         resultados["total_errores"] = len(resultados["errores"])
-        
-        logger.info(f"Procesamiento masivo completado: "
-                   f"{resultados['total_validos']} válidos, "
-                   f"{resultados['total_invalidos']} inválidos, "
-                   f"{resultados['total_errores']} errores")
-        
+
+        logger.info(
+            f"Procesamiento masivo completado: "
+            f"{resultados['total_validos']} válidos, "
+            f"{resultados['total_invalidos']} inválidos, "
+            f"{resultados['total_errores']} errores"
+        )
+
         return resultados
 
-    def _process_batch_individually(self, batch: List[str], resultados: Dict[str, Any],
-                                  update_partners: bool) -> None:
+    def _process_batch_individually(
+        self, batch: List[str], resultados: Dict[str, Any], update_partners: bool
+    ) -> None:
         """
         Procesa un lote de RUCs individualmente.
         NUEVA FUNCIÓN: Helper para procesamiento individual.
-        
+
         Args:
             batch: Lista de RUCs a procesar
             resultados: Dict donde almacenar resultados
@@ -1542,57 +1603,62 @@ class MigoAPIService:
             # Verificar cache de inválidos primero
             if self._is_ruc_marked_invalid(ruc):
                 resultados["cache_hits"] += 1
-                invalid_info = self.cache_service.get(self.INVALID_RUCS_CACHE_KEY, {}).get(ruc, {})
-                resultados["invalidos"].append({
-                    "ruc": ruc,
-                    "error": f"RUC en cache inválidos: {invalid_info.get('reason', 'Desconocido')}",
-                    "type": "invalid",
-                    "subtype": "cached"
-                })
+                invalid_info = self.cache_service.get(
+                    self.INVALID_RUCS_CACHE_KEY, {}
+                ).get(ruc, {})
+                resultados["invalidos"].append(
+                    {
+                        "ruc": ruc,
+                        "error": f"RUC en cache inválidos: {invalid_info.get('reason', 'Desconocido')}",
+                        "type": "invalid",
+                        "subtype": "cached",
+                    }
+                )
                 continue
-            
+
             # Verificar cache normal
-            cache_key = self.cache_service.get_service_cache_key('migo', f"ruc_{ruc}")
+            cache_key = self.cache_service.get_service_cache_key("migo", f"ruc_{ruc}")
             cached_data = self.cache_service.get(cache_key)
             if cached_data:
                 resultados["cache_hits"] += 1
-                resultados["validos"].append({
-                    "ruc": ruc,
-                    "data": cached_data,
-                    "cache_hit": True
-                })
+                resultados["validos"].append(
+                    {"ruc": ruc, "data": cached_data, "cache_hit": True}
+                )
                 if update_partners:
                     self._update_partner_sunat_status(ruc, cached_data)
                 continue
-            
+
             # Consultar API individualmente
             api_response = self.consultar_ruc(ruc, update_partner=update_partners)
             resultados["api_calls"] += 1
-            
+
             if api_response.get("success"):
-                resultados["validos"].append({
-                    "ruc": ruc,
-                    "data": api_response.get("data", {})
-                })
-            elif api_response.get("invalid_sunat") or api_response.get("invalid_format"):
-                resultados["invalidos"].append({
-                    "ruc": ruc,
-                    "error": api_response.get("error"),
-                    "type": "invalid",
-                    "subtype": "sunat" if api_response.get("invalid_sunat") else "format"
-                })
+                resultados["validos"].append(
+                    {"ruc": ruc, "data": api_response.get("data", {})}
+                )
+            elif api_response.get("invalid_sunat") or api_response.get(
+                "invalid_format"
+            ):
+                resultados["invalidos"].append(
+                    {
+                        "ruc": ruc,
+                        "error": api_response.get("error"),
+                        "type": "invalid",
+                        "subtype": (
+                            "sunat" if api_response.get("invalid_sunat") else "format"
+                        ),
+                    }
+                )
             else:
-                resultados["errores"].append({
-                    "ruc": ruc,
-                    "error": api_response.get("error"),
-                    "type": "error"
-                })
-    
+                resultados["errores"].append(
+                    {"ruc": ruc, "error": api_response.get("error"), "type": "error"}
+                )
+
     def get_invalid_rucs_report(self) -> Dict[str, Any]:
         """
         Obtiene un reporte de los RUCs marcados como inválidos.
         NUEVA FUNCIÓN: Para monitoreo y debugging.
-        
+
         Returns:
             Dict con información de RUCs inválidos
         """
@@ -1606,23 +1672,23 @@ class MigoAPIService:
                         "ruc": ruc,
                         "reason": data.get("reason"),
                         "timestamp": data.get("added_at") or data.get("timestamp"),
-                        "ttl_hours": data.get("ttl_hours")
+                        "ttl_hours": data.get("ttl_hours"),
                     }
                     for ruc, data in invalid_rucs.items()
-                ]
+                ],
             }
         except Exception as e:
             logger.error(f"Error obteniendo reporte de RUCs inválidos: {e}")
             return {"total_invalidos": 0, "invalid_rucs": []}
-    
+
     def clear_invalid_rucs_cache(self, ruc: str = None) -> Dict[str, Any]:
         """
         Limpia el cache de RUCs inválidos.
         NUEVA FUNCIÓN: Para mantenimiento.
-        
+
         Args:
             ruc: Si se especifica, limpia solo ese RUC específico
-            
+
         Returns:
             Dict con resultado de la operación
         """
@@ -1632,10 +1698,20 @@ class MigoAPIService:
                 if removed:
                     return {"success": True, "message": f"RUC {ruc} removido del cache"}
                 else:
-                    return {"success": False, "message": f"RUC {ruc} no encontrado en cache"}
+                    return {
+                        "success": False,
+                        "message": f"RUC {ruc} no encontrado en cache",
+                    }
             else:
                 cleared = self.cache_service.clear_invalid_rucs()
-                return {"success": True, "message": "Cache de RUCs inválidos limpiado"} if cleared else {"success": False, "message": "No se pudo limpiar el cache de inválidos"}
+                return (
+                    {"success": True, "message": "Cache de RUCs inválidos limpiado"}
+                    if cleared
+                    else {
+                        "success": False,
+                        "message": "No se pudo limpiar el cache de inválidos",
+                    }
+                )
         except Exception as e:
             logger.error(f"Error limpiando cache de RUCs inválidos: {e}")
             return {"success": False, "message": str(e)}

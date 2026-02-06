@@ -79,59 +79,56 @@ def dashboard_monitoreo(request):
 
     return render(request, "api_service/dashboard.html", context)
 
+
 #### PDF FACTURACION
 from django.http import JsonResponse, HttpResponse
 from django.views import View
 import json
 from billing.services import InvoiceService
 
+
 class GenerateInvoiceAPIView(View):
     """API para generar facturas desde tu servicio actual"""
-    
+
     async def post(self, request):
         try:
             # Obtener datos del request
             invoice_data = json.loads(request.body)
-            
+
             # Usar el servicio de facturas
             invoice_service = InvoiceService()
             result = await invoice_service.create_invoice(
-                invoice_data, 
-                generate_pdf=True
+                invoice_data, generate_pdf=True
             )
-            
-            if result['success']:
+
+            if result["success"]:
                 response_data = {
-                    'status': 'success',
-                    'invoice_id': invoice_data.get('numero'),
-                    'codigo_unico': result['invoice_data'].get('codigo_hash'),
-                    'pdf_generated': result['pdf_content'] is not None,
-                    'nubefact_response': result['nubefact_response']
+                    "status": "success",
+                    "invoice_id": invoice_data.get("numero"),
+                    "codigo_unico": result["invoice_data"].get("codigo_hash"),
+                    "pdf_generated": result["pdf_content"] is not None,
+                    "nubefact_response": result["nubefact_response"],
                 }
-                
+
                 # Si se requiere el PDF en la respuesta
-                if request.GET.get('include_pdf') == 'true' and result['pdf_content']:
+                if request.GET.get("include_pdf") == "true" and result["pdf_content"]:
                     response = HttpResponse(
-                        result['pdf_content'],
-                        content_type='application/pdf'
+                        result["pdf_content"], content_type="application/pdf"
                     )
-                    response['Content-Disposition'] = f'attachment; filename="factura_{invoice_data["numero"]}.pdf"'
+                    response["Content-Disposition"] = (
+                        f'attachment; filename="factura_{invoice_data["numero"]}.pdf"'
+                    )
                     return response
-                
+
                 return JsonResponse(response_data)
-            
-            return JsonResponse({
-                'status': 'error',
-                'message': result['error']
-            }, status=400)
-            
+
+            return JsonResponse(
+                {"status": "error", "message": result["error"]}, status=400
+            )
+
         except json.JSONDecodeError:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'JSON inválido'
-            }, status=400)
+            return JsonResponse(
+                {"status": "error", "message": "JSON inválido"}, status=400
+            )
         except Exception as e:
-            return JsonResponse({
-                'status': 'error',
-                'message': str(e)
-            }, status=500)
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
