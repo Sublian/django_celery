@@ -1,6 +1,6 @@
 # api_service/services/service_factory.py
-from .nubefact_service import NubefactService
-from ..migo_service import MigoAPIService
+from nubefact.nubefact_service import NubefactService
+from migo.migo_service import MigoAPIService
 
 class ServiceFactory:
     """Factory para crear instancias de servicios."""
