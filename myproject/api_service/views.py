@@ -84,7 +84,7 @@ def dashboard_monitoreo(request):
 from django.http import JsonResponse, HttpResponse
 from django.views import View
 import json
-from billing.services import InvoiceService
+from billing.services.invoice_service import InvoiceService
 
 
 class GenerateInvoiceAPIView(View):

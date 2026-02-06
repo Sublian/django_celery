@@ -5,9 +5,11 @@ import logging
 from typing import Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 from abc import ABC
-
 import httpx
+from asgiref.sync import sync_to_async
+
 from django.conf import settings
+from django.utils import timezone
 
 from api_service.models import ApiService, ApiEndpoint, ApiRateLimit, ApiCallLog
 from api_service.services.nubefact.exceptions import (
@@ -178,7 +180,7 @@ class NubefactServiceAsync(ABC):
         data: Any, 
         method: str = "POST", 
         batch_request=None, 
-        caller_context: str = None
+        caller_context=None
     ) -> dict:
         # Ensure async init has been called
         if not self._initialized:
@@ -234,9 +236,7 @@ class NubefactServiceAsync(ABC):
         
         # Get called_from context - this is the NEW PART
         called_from = None
-        if caller_context:
-            called_from = caller_context
-        elif batch_request:
+        if batch_request:
             called_from = getattr(batch_request, 'called_from', 'batch')
         else:
             # Try to get caller information from stack
@@ -311,37 +311,57 @@ class NubefactServiceAsync(ABC):
     ) -> None:
         """Wrapper asincrónico para logging."""
         try:
-            # Get endpoint object for service association
-            loop = asyncio.get_event_loop()
-            endpoint_obj = await loop.run_in_executor(
-                self._executor, self._get_endpoint_sync, endpoint_name
+            # Convertir las operaciones DB a async
+            await sync_to_async(self._save_log_sync)(
+                endpoint_name=endpoint_name,
+                status_code=status_code,
+                duration_ms=duration_ms,
+                request_data=request_data,
+                response_data=response_data,
+                called_from=called_from or "unknown"
             )
-            
-            if not endpoint_obj:
-                logger.warning(f"Cannot log API call: endpoint {endpoint_name} not found")
-                return
-            
-            # Prepare log data
-            log_data = {
-                'service': endpoint_obj.service,
-                'endpoint': endpoint_obj,
-                'status_code': status_code,
-                'duration_ms': duration_ms,
-                'request_data': request_data if request_data else {},
-                'response_data': response_data if response_data else {},
-                'called_from': called_from if called_from else 'unknown',
-                'success': 200 <= status_code < 300
-            }
-            
-            # Save via executor to avoid sync DB operations in async context
-            await loop.run_in_executor(
-                self._executor, 
-                self._save_api_log_sync, 
-                log_data
-            )
-            
         except Exception as e:
-            logger.error(f"Failed to log API call: {str(e)}")
+            # Solo loggear, no romper el flujo principal
+            import logging
+            logging.getLogger(__name__).error(f"Failed to log API call: {str(e)}")
+        
+        
+    def _save_log_sync(self, endpoint_name, status_code, duration_ms, 
+                   request_data, response_data, called_from):
+        """
+        Versión sincrónica que se ejecuta en un thread separado
+        """
+        from api_service.models import ApiCallLog, ApiService, ApiEndpoint
+        
+        try:
+            # 1. Buscar servicio y endpoint
+            service = ApiService.objects.get(name="NubeFact")
+            endpoint = ApiEndpoint.objects.get(service=service, name=endpoint_name)
+            
+            # 2. Preparar datos para guardar
+            request_json = json.dumps(request_data, ensure_ascii=False)[:2000] if request_data else "{}"
+            response_json = json.dumps(response_data, ensure_ascii=False)[:2000] if response_data else "{}"
+            
+            # 3. Crear el log
+            ApiCallLog.objects.create(
+                service=service,
+                endpoint=endpoint,
+                status_code=status_code,
+                duration_ms=duration_ms,
+                request_data=request_json,
+                response_data=response_json,
+                called_from=called_from,
+                status='SUCCESS' if 200 <= status_code < 300 else 'FAILED',
+                created_at=timezone.now()
+            )
+            
+        except ApiService.DoesNotExist:
+            print(f"⚠️ Servicio NubeFact no encontrado en BD")
+        except ApiEndpoint.DoesNotExist:
+            print(f"⚠️ Endpoint '{endpoint_name}' no encontrado en BD")
+        except Exception as e:
+            print(f"⚠️ Error inesperado guardando log: {str(e)}")
+        
     async def generar_comprobante(self, payload: dict, batch_request=None, caller_context: str = None) -> dict:
         """
         Genera comprobante con tracking de contexto
