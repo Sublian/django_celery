@@ -130,7 +130,7 @@
 
 ## Diagrama de Dependencias
 
-```
+```text
                     ┌─────────────────┐
                     │   exceptions.py │
                     └────────┬────────┘
@@ -165,7 +165,7 @@
 
 ## Flujo de una Petición Exitosa                    
 
-```
+```mermaid
 sequenceDiagram
     participant Cliente
     participant NubefactServiceAsync
@@ -190,7 +190,7 @@ sequenceDiagram
 
 ## Flujo de Error con Logging
 
-```
+```mermaid
 sequenceDiagram
     participant Cliente
     participant NubefactServiceAsync
