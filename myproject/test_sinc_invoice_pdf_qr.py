@@ -66,7 +66,7 @@ class InvoiceTestRunner:
     def create_test_invoice_data(self, invoice_number=None):
         """Crea datos de prueba completos para una factura"""
         if invoice_number is None:
-            invoice_number = 91502
+            invoice_number = 91507
             # invoice_number = f"{int(datetime.now().timestamp() % 100000)}"
         
         return {
