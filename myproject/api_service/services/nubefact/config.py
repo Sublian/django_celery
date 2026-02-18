@@ -89,9 +89,7 @@ class NubefactConfig:
         """
         try:
             # Obtener configuración del servicio de la BD
-            self.service = ApiService.objects.filter(
-                service_type="NUBEFACT", is_active=True
-            ).first()
+            self.service = ApiService.objects.get(name="NUBEFACT Perú")
 
             if not self.service:
                 raise ValueError(
@@ -100,16 +98,16 @@ class NubefactConfig:
                 )
 
             # Obtener base URL (sin paths - similar a MigoAPIService)
-            self.base_url = self.service.base_url or os.getenv("NUBEFACT_API_URL")
+            self.base_url = getattr(self.service, 'base_url', 'https://api.nubefact.com')
 
             # Obtener token de autenticación
-            self.auth_token = self.service.auth_token or os.getenv("NUBEFACT_API_TOKEN")
+            self.auth_token = getattr(self.service, 'auth_token', None)
 
             # Validar que base_url exista
             if not self.base_url:
                 raise ValueError(
                     "URL base de Nubefact no configurada. "
-                    "Establece ApiService.base_url o variable NUBEFACT_API_URL. "
+                    "Establece ApiService.base_url. "
                     "Nota: base_url debe ser SOLO la URL base (ej: https://api.nubefact.com), "
                     "los paths vienen de ApiEndpoint."
                 )
@@ -124,10 +122,10 @@ class NubefactConfig:
             # Normalizar URL base (remover trailing slash)
             self.base_url = self.base_url.rstrip("/")
 
-            logger.info(
-                f"Configuración de Nubefact cargada correctamente. "
-                f"Base URL: {self.base_url} | Endpoints: se cargan desde ApiEndpoint"
-            )
+            # logger.info(
+            #     f"Configuración de Nubefact cargada correctamente. "
+            #     f"Base URL: {self.base_url} | Endpoints: se cargan desde ApiEndpoint"
+            # )
 
         except ApiService.DoesNotExist:
             raise ValueError(
