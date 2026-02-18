@@ -335,7 +335,7 @@ class NubefactServiceAsync(ABC):
         
         try:
             # 1. Buscar servicio y endpoint
-            service = ApiService.objects.get(name="NubeFact")
+            service = ApiService.objects.get(name="NUBEFACT Perú")
             endpoint = ApiEndpoint.objects.get(service=service, name=endpoint_name)
             
             # 2. Preparar datos para guardar
@@ -346,7 +346,7 @@ class NubefactServiceAsync(ABC):
             ApiCallLog.objects.create(
                 service=service,
                 endpoint=endpoint,
-                status_code=status_code,
+                response_code=status_code,
                 duration_ms=duration_ms,
                 request_data=request_json,
                 response_data=response_json,

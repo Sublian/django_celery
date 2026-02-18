@@ -3,6 +3,7 @@
 """
 Simple Test - Verifica configuración básica
 """
+from datetime import datetime
 import os
 import sys
 import time
@@ -60,7 +61,7 @@ try:
     # Datos de prueba mínimos
     test_data = {
         "serie": "F001",
-        "numero": 91508,
+        "numero": 91500,
         "operacion": "generar_comprobante",
         "tipo_de_comprobante": "1",
         "sunat_transaction": 30,
@@ -71,8 +72,8 @@ try:
         "cliente_email": "",
         "cliente_email_1": "",
         "cliente_email_2": "",
-        "fecha_de_emision": "2026-02-06",
-        "fecha_de_vencimiento": "2026-02-28",
+        "fecha_de_emision": datetime.now().strftime("%Y-%m-%d"),
+        "fecha_de_vencimiento": datetime.now().strftime("%Y-%m-%d"),
         "moneda": "1",
         "tipo_de_cambio": "",
         "porcentaje_de_igv": 18.0,
