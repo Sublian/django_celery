@@ -130,6 +130,7 @@
 
 ## Diagrama de Dependencias
 
+```
                     ┌─────────────────┐
                     │   exceptions.py │
                     └────────┬────────┘
@@ -160,9 +161,11 @@
                     ┌────────▼────────┐
                     │    schemas.py   │
                     └─────────────────┘
+```
 
 ## Flujo de una Petición Exitosa                    
 
+```
 sequenceDiagram
     participant Cliente
     participant NubefactServiceAsync
@@ -183,9 +186,11 @@ sequenceDiagram
     BaseService->>BaseService: _log_api_call_async()
     BaseService-->>NubefactServiceAsync: result
     NubefactServiceAsync-->>Cliente: response
+```
 
 ## Flujo de Error con Logging
 
+```
 sequenceDiagram
     participant Cliente
     participant NubefactServiceAsync
@@ -206,6 +211,6 @@ sequenceDiagram
     DB-->>BaseService: (background)
     BaseService-->>NubefactServiceAsync: raise Exception
     NubefactServiceAsync-->>Cliente: ❌ Exception
+```
 
-    
 
