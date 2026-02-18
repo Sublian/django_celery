@@ -279,7 +279,9 @@ class ApiCallLog(models.Model):
     )
 
     error_message = models.TextField(
-        blank=True, help_text="Mensaje de error en caso de fallo"
+        null=True,
+        blank=True, 
+        help_text="Mensaje de error en caso de fallo"
     )
 
     duration_ms = models.IntegerField(
