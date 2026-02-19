@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from .base_service import BaseAPIService
 from .exceptions import NubefactAPIError, NubefactValidationError
 from .validators import validate_json_structure, validate_totals
+from ..base.timeout_config import TimeoutConfig
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class NubefactService(BaseAPIService):
         51: "Cuenta suspendida por falta de pago",
     }
 
-    def __init__(self, timeout: tuple = None):
+    def __init__(self, timeout_config: Optional[TimeoutConfig] = None):
         """
         Inicializa el servicio Nubefact.
 
@@ -69,7 +70,7 @@ class NubefactService(BaseAPIService):
 
         # Configurar cliente HTTP
         self.session = requests.Session()
-        self.timeout = timeout or self.DEFAULT_TIMEOUT
+        self.timeout_config = timeout_config or TimeoutConfig.from_settings("NUBEFACT")
         self._configure_session()
 
     def _validate_and_format_token(self, token: str) -> str:
@@ -107,7 +108,7 @@ class NubefactService(BaseAPIService):
                 }
             )
 
-            logger.debug(f"Sesión HTTP configurada con timeout {self.timeout}")
+            logger.debug(f"Sesión HTTP configurada con timeout {self.timeout_config}")
 
         except ValueError as e:
             logger.error(f"Error configurando sesión: {str(e)}")
@@ -270,7 +271,7 @@ class NubefactService(BaseAPIService):
             # Enviar solicitud con timeout del endpoint o timeout por defecto
             if method.upper() == "POST":
                 response = self.session.post(
-                    url, json=validated_data, timeout=endpoint.timeout or self.timeout
+                    url, json=validated_data, timeout=endpoint.timeout or self.timeout_config
                 )
             else:
                 raise ValueError(f"Método no soportado: {method}. Solo se soporta POST")

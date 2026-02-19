@@ -17,6 +17,8 @@ from api_service.services.nubefact.exceptions import (
     NubefactValidationError,
 )
 from api_service.services.nubefact.validators import validate_json_structure
+from ..base.timeout_config import TimeoutConfig
+from .config import NubefactConfig
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +36,17 @@ class NubefactServiceAsync(ABC):
 
     DEFAULT_TIMEOUT = (30.0, 60.0)
 
-    def __init__(self, service_name: str = "NUBEFACT", timeout: Optional[tuple] = None):
+    def __init__(self, service_name: str = "NUBEFACT", timeout_config: Optional[TimeoutConfig] = None):
+        """
+        Inicializa el servicio asíncrono NubeFact.
+        """
         self.service_type = service_name
         self.service = None
-        self.timeout = timeout or self.DEFAULT_TIMEOUT
+        self.timeout_config = timeout_config or TimeoutConfig.from_settings("NUBEFACT")
         self._client: Optional[httpx.AsyncClient] = None
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._initialized = False
+        self.config = None
 
     async def _async_init(self):
         """
@@ -50,6 +56,8 @@ class NubefactServiceAsync(ABC):
         if self._initialized:
             return
 
+        
+        self.config = await NubefactConfig.create(timeout_config=self.timeout_config)
         loop = asyncio.get_event_loop()
         self.service = await loop.run_in_executor(
             self._executor, self._load_config_sync
@@ -178,6 +186,7 @@ class NubefactServiceAsync(ABC):
     def _get_caller_info(self):
         """Obtiene información del caller de forma segura"""
         import inspect
+
         try:
             frame = inspect.currentframe()
             # Subir 2 niveles para saltar esta función y send_request
@@ -186,15 +195,15 @@ class NubefactServiceAsync(ABC):
                 return f"{caller_frame.f_code.co_name}:{caller_frame.f_lineno}"
         except:
             pass
-        return 'unknown'
-    
-    
+        return "unknown"
+
     async def send_request(
-        self, endpoint_name: str, 
-        data: Any, 
-        method: str = "POST", 
-        batch_request=None, 
-        caller_context=None
+        self,
+        endpoint_name: str,
+        data: Any,
+        method: str = "POST",
+        batch_request=None,
+        caller_context=None,
     ) -> dict:
         # Ensure async init has been called
         if not self._initialized:
@@ -227,12 +236,12 @@ class NubefactServiceAsync(ABC):
 
         # Determinar called_from una sola vez
         if batch_request:
-            called_from = getattr(batch_request, 'called_from', 'batch')
+            called_from = getattr(batch_request, "called_from", "batch")
         elif caller_context:
             called_from = caller_context
         else:
             called_from = self._get_caller_info()
-        
+
         validated_data_copy = validated_data.copy() if validated_data else {}
 
         try:
@@ -241,12 +250,12 @@ class NubefactServiceAsync(ABC):
                 resp = await client.post(url, json=validated_data)
             else:
                 resp = await client.request(method.upper(), url, json=validated_data)
-            
+
             duration_ms = int((time.time() - start) * 1000)
-            
+
             # Procesar respuesta (puede lanzar excepción si hay error de validación)
             result = self._handle_response_simple(resp)
-            
+
             # ✅ LOG EXITOSO (siempre en background)
             asyncio.create_task(self._update_rate_limit_async(endpoint_name))
             asyncio.create_task(
@@ -256,17 +265,17 @@ class NubefactServiceAsync(ABC):
                     duration_ms=duration_ms,
                     request_data=validated_data_copy,
                     response_data=result,
-                    called_from=called_from
+                    called_from=called_from,
                 )
             )
-            
+
             return result
-            
+
         except httpx.RequestError as exc:
             # Error de red/timeout
             duration_ms = int((time.time() - start) * 1000)
-            error_response = {'error': str(exc), 'type': 'RequestError'}
-            
+            error_response = {"error": str(exc), "type": "RequestError"}
+
             # ✅ LOG DE ERROR DE RED (background)
             asyncio.create_task(
                 self._log_api_call_async(
@@ -275,18 +284,18 @@ class NubefactServiceAsync(ABC):
                     duration_ms=duration_ms,
                     request_data=validated_data_copy,
                     response_data=error_response,
-                    called_from=called_from
+                    called_from=called_from,
                 )
             )
             raise NubefactAPIError(str(exc))
-            
+
         except (NubefactValidationError, NubefactAPIError) as exc:
             # Error de validación o API (ya tienen su propio logging interno?)
             duration_ms = int((time.time() - start) * 1000)
-            
+
             # Determinar código de respuesta si está disponible
-            status_code = getattr(exc, 'status_code', 400)
-            
+            status_code = getattr(exc, "status_code", 400)
+
             # ✅ LOG DE ERROR DE VALIDACIÓN (background)
             asyncio.create_task(
                 self._log_api_call_async(
@@ -294,16 +303,16 @@ class NubefactServiceAsync(ABC):
                     status_code=status_code,
                     duration_ms=duration_ms,
                     request_data=validated_data_copy,
-                    response_data={'error': str(exc), 'type': exc.__class__.__name__},
-                    called_from=called_from
+                    response_data={"error": str(exc), "type": exc.__class__.__name__},
+                    called_from=called_from,
                 )
             )
             raise
-            
+
         except Exception as exc:
             # Error inesperado
             duration_ms = int((time.time() - start) * 1000)
-            
+
             # ✅ LOG DE ERROR INESPERADO (background)
             asyncio.create_task(
                 self._log_api_call_async(
@@ -311,12 +320,12 @@ class NubefactServiceAsync(ABC):
                     status_code=500,
                     duration_ms=duration_ms,
                     request_data=validated_data_copy,
-                    response_data={'error': str(exc), 'type': 'UnexpectedError'},
-                    called_from=called_from
+                    response_data={"error": str(exc), "type": "UnexpectedError"},
+                    called_from=called_from,
                 )
             )
             raise
-        
+
     def _handle_response_simple(self, response: httpx.Response) -> dict:
         """Procesa respuesta sin logging (async-safe)."""
         try:
@@ -355,13 +364,13 @@ class NubefactServiceAsync(ABC):
             logger.warning(f"Error updating rate limit async: {e}")
 
     async def _log_api_call_async(
-        self, 
-        endpoint_name: str, 
-        status_code: int, 
+        self,
+        endpoint_name: str,
+        status_code: int,
         duration_ms: int,
         request_data: dict = None,
         response_data: dict = None,
-        called_from: str = None
+        called_from: str = None,
     ) -> None:
         """Wrapper asincrónico para logging - VERSIÓN MEJORADA"""
         try:
@@ -372,20 +381,27 @@ class NubefactServiceAsync(ABC):
                 duration_ms=duration_ms,
                 request_data=request_data,
                 response_data=response_data,
-                called_from=called_from or "unknown"
+                called_from=called_from or "unknown",
             )
         except Exception as e:
             # Solo loggear, no romper el flujo principal
-            logger.error(f"Failed to log API call: {str(e)}", exc_info=True)   
-        
-    def _save_log_sync(self, endpoint_name, status_code, duration_ms, 
-                    request_data, response_data, called_from):
+            logger.error(f"Failed to log API call: {str(e)}", exc_info=True)
+
+    def _save_log_sync(
+        self,
+        endpoint_name,
+        status_code,
+        duration_ms,
+        request_data,
+        response_data,
+        called_from,
+    ):
         """
         Versión sincrónica que se ejecuta en un thread separado
         VERSIÓN MEJORADA con mejor manejo de errores
         """
         from api_service.models import ApiCallLog, ApiService, ApiEndpoint
-        
+
         try:
             # 1. Buscar servicio NUBEFACT Perú
             try:
@@ -395,21 +411,20 @@ class NubefactServiceAsync(ABC):
                 # Intentar crear el servicio si no existe
                 try:
                     service = ApiService.objects.create(
-                        name="NUBEFACT Perú",
-                        base_url="https://api.nubefact.com"
+                        name="NUBEFACT Perú", base_url="https://api.nubefact.com"
                     )
                     logger.info("✅ Servicio 'NUBEFACT Perú' creado automáticamente")
                 except Exception as e:
                     logger.error(f"❌ No se pudo crear servicio: {e}")
                     return
-            
+
             # 2. Buscar endpoint
             try:
                 endpoint = ApiEndpoint.objects.get(service=service, name=endpoint_name)
             except ApiEndpoint.DoesNotExist:
                 logger.error(f"⚠️ Endpoint '{endpoint_name}' no encontrado en BD")
                 return
-            
+
             # 3. Preparar datos para guardar (limitar tamaño)
             request_json = None
             if request_data:
@@ -417,17 +432,21 @@ class NubefactServiceAsync(ABC):
                     request_json = json.dumps(request_data, ensure_ascii=False)[:10000]
                 except:
                     request_json = json.dumps({"error": "Could not serialize request"})
-            
+
             response_json = None
             if response_data:
                 try:
-                    response_json = json.dumps(response_data, ensure_ascii=False)[:10000]
+                    response_json = json.dumps(response_data, ensure_ascii=False)[
+                        :10000
+                    ]
                 except:
-                    response_json = json.dumps({"error": "Could not serialize response"})
-            
+                    response_json = json.dumps(
+                        {"error": "Could not serialize response"}
+                    )
+
             # 4. Determinar estado
             is_success = 200 <= status_code < 300 if status_code else False
-            
+
             # 5. Crear el log
             ApiCallLog.objects.create(
                 service=service,
@@ -437,57 +456,70 @@ class NubefactServiceAsync(ABC):
                 request_data=request_json,
                 response_data=response_json,
                 called_from=called_from,
-                status='SUCCESS' if is_success else 'FAILED',
-                error_message=response_data.get('error') if not is_success and response_data else None,
-                created_at=timezone.now()
+                status="SUCCESS" if is_success else "FAILED",
+                error_message=(
+                    response_data.get("error")
+                    if not is_success and response_data
+                    else None
+                ),
+                created_at=timezone.now(),
             )
-            
-            logger.debug(f"✅ Log guardado para {endpoint_name} - status: {status_code}")
-            
+
+            logger.debug(
+                f"✅ Log guardado para {endpoint_name} - status: {status_code}"
+            )
+
         except Exception as e:
             logger.error(f"⚠️ Error inesperado guardando log: {str(e)}", exc_info=True)
-        
-    async def generar_comprobante(self, payload: dict, batch_request=None, caller_context: str = None) -> dict:
+
+    async def generar_comprobante(
+        self, payload: dict, batch_request=None, caller_context: str = None
+    ) -> dict:
         """
         Genera comprobante con tracking de contexto
-        
+
         Args:
             payload: Datos del comprobante
             caller_context: Quién está llamando (para logging)
         """
         # Extraer metadata si existe
-        metadata = payload.pop('_metadata', {}) if '_metadata' in payload else {}
-        
+        metadata = payload.pop("_metadata", {}) if "_metadata" in payload else {}
+
         # Usar caller_context explícito o metadata
-        final_caller = caller_context or metadata.get('called_from', 'unknown')
-        
+        final_caller = caller_context or metadata.get("called_from", "unknown")
+
         return await self.send_request(
-            "generar_comprobante", 
-            payload, method="POST", 
-            batch_request=batch_request, 
-            caller_context=final_caller
+            "generar_comprobante",
+            payload,
+            method="POST",
+            batch_request=batch_request,
+            caller_context=final_caller,
         )
-        
+
     def _save_api_log_sync(self, log_data: dict) -> None:
         """
         Synchronous method to save API log to database.
         """
         try:
             # Truncate long data for database fields
-            request_str = json.dumps(log_data['request_data'], ensure_ascii=False)[:2000]
-            response_str = json.dumps(log_data['response_data'], ensure_ascii=False)[:2000]
-            
+            request_str = json.dumps(log_data["request_data"], ensure_ascii=False)[
+                :2000
+            ]
+            response_str = json.dumps(log_data["response_data"], ensure_ascii=False)[
+                :2000
+            ]
+
             ApiCallLog.objects.create(
-                service=log_data['service'],
-                endpoint=log_data['endpoint'],
-                status_code=log_data['status_code'],
-                duration_ms=log_data['duration_ms'],
+                service=log_data["service"],
+                endpoint=log_data["endpoint"],
+                status_code=log_data["status_code"],
+                duration_ms=log_data["duration_ms"],
                 request_data=request_str,
                 response_data=response_str,
-                called_from=log_data['called_from'],
-                status='SUCCESS' if log_data['success'] else 'FAILED'
+                called_from=log_data["called_from"],
+                status="SUCCESS" if log_data["success"] else "FAILED",
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to save API log to DB: {str(e)}")
 

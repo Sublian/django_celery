@@ -65,16 +65,16 @@ class ComprobanteParaEnvio(BaseModel):
             Decimal: lambda v: float(v)  # Nubefact espera números, no strings
         }
 
+
 class ComprobanteSchema(BaseModel):
     tipo_de_comprobante: str
     serie: str
     numero: str
     cliente_numero_de_documento: str
-    
-    @validator('cliente_numero_de_documento')
+
+    @validator("cliente_numero_de_documento")
     def validate_ruc(cls, v):
         if len(v) != 11:
-            raise ValueError('RUC debe tener 11 dígitos')
+            raise ValueError("RUC debe tener 11 dígitos")
         # Validar dígito verificador
         return v
-    
