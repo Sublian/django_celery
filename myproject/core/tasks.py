@@ -160,9 +160,10 @@ TASK_DISPATCHER = {
 
 #     return f"{reprocesadas} tareas reprocesadas, {no_reconocidas} no reconocidas."
 
+
 @shared_task
 def reprocess_pending_tasks(batch_size=50):
-    pending_qs = PendingTask.objects.filter(processed=False).order_by('created_at')
+    pending_qs = PendingTask.objects.filter(processed=False).order_by("created_at")
     reprocesadas = 0
     with transaction.atomic():
         to_process = list(pending_qs.select_for_update(skip_locked=True)[:batch_size])
@@ -173,9 +174,9 @@ def reprocess_pending_tasks(batch_size=50):
                     task.delete()
                     reprocesadas += 1
                 else:
-                    task.attempts = F('attempts') + 1
+                    task.attempts = F("attempts") + 1
                     task.save()
             except Exception as e:
-                task.attempts = F('attempts') + 1
+                task.attempts = F("attempts") + 1
                 task.save()
     return f"{reprocesadas} reprocesadas"

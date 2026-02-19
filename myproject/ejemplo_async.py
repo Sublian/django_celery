@@ -15,7 +15,7 @@ from pathlib import Path
 # Agregar path para imports
 sys.path.insert(0, str(Path(__file__).parent / "myproject"))
 
-from api_service.services.migo_service_async import (
+from api_service.services.migo.migo_service_async import (
     MigoAPIServiceAsync,
     validate_ruc,
     validate_dni,

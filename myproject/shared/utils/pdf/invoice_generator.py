@@ -137,9 +137,11 @@ class InvoicePDFGenerator(BasePDFGenerator):
             "monto_total": self.invoice_data.get("total"),
             "fecha_emision": self.invoice_data.get("fecha_de_emision"),
             "ruc_receptor": self.invoice_data.get("cliente_numero_de_documento"),
-            "cliente_tipo_de_documento": self.invoice_data.get("cliente_tipo_de_documento"),
+            "cliente_tipo_de_documento": self.invoice_data.get(
+                "cliente_tipo_de_documento"
+            ),
         }
-        anio, mes, dia = qr_info['fecha_emision'].split('-')
+        anio, mes, dia = qr_info["fecha_emision"].split("-")
         fecha_final = f"{dia}/{mes}/{anio}"
         # Crear cadena similar al formato NubeFact
         cadena = f"""{qr_info['ruc_emisor']}|{qr_info['tipo_doc']}|

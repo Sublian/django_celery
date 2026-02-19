@@ -64,20 +64,14 @@ def upload_file(request):
         redis_ok = is_redis_available()
         celery_ok = is_celery_available()
 
-        
-
         if redis_ok and celery_ok:
-            TaskDispatcher.dispatch(
-                "process_csv_file",
-                file_id=obj.id
-            )
+            TaskDispatcher.dispatch("process_csv_file", file_id=obj.id)
             logger.info(
                 f"✅ Celery activo, tarea encolada para archivo '{name}' (ID {obj.id})"
             )
         else:
             PendingTask.objects.create(
-                task_name="process_csv_file",
-                args={"file_id": obj.id}
+                task_name="process_csv_file", args={"file_id": obj.id}
             )
             logger.warning(
                 f"⚠️ Celery/Redis inactivos. Guardando tarea pendiente para '{name}'"
@@ -219,7 +213,7 @@ def reprocesar_pendientes(request):
         # Extraemos el nombre de la tarea y los argumentos
         task_name = p.task_name
         args = p.args or {}
-        
+
         # 2️⃣ Buscamos si la tarea está en el despachador
         try:
             TaskDispatcher.dispatch(task_name, **args)
@@ -230,9 +224,7 @@ def reprocesar_pendientes(request):
             )
         except ValueError:
             no_reconocidas += 1
-            logger.warning(
-                f"Tarea '{task_name}' no registrada en el dispatcher."
-            )
+            logger.warning(f"Tarea '{task_name}' no registrada en el dispatcher.")
         except Exception as e:
             logger.error(
                 f"Error reintentando tarea pendiente '{task_name}' (ID={p.id}): {e}"

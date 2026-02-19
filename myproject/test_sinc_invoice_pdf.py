@@ -49,7 +49,7 @@ try:
     from shared.utils.pdf.invoice_generator import InvoicePDFGenerator
     from api_service.services.nubefact.nubefact_service import NubefactService
     from api_service.models import ApiCallLog
-    
+
     print("🔧 Iniciando prueba de emisión Nubefact...")
 
     # Contar logs antes de la prueba
@@ -57,7 +57,7 @@ try:
         service__service_type="NUBEFACT"
     ).count()
     print(f"   Logs existentes antes: {initial_log_count}")
-    
+
     # Datos de prueba mínimos
     test_data = {
         "serie": "F001",
@@ -140,26 +140,26 @@ try:
     # Crear instancia del servicio
     print("1. Creando servicio Nubefact...")
     servicio = NubefactService()
-    
+
     # Verificar configuración cargada
     print(f"   URL Base: {servicio.base_url}")
     print(
         f"   Token: {'*' * 10}{servicio.auth_token[-5:] if servicio.auth_token else 'NO TOKEN'}"
     )
-    
+
     # 3. Enviar comprobante
     print("\n2. Enviando comprobante a Nubefact...")
     respuesta = servicio.generar_comprobante(test_data)
     # Esperar un momento para que se complete el logging
     time.sleep(0.5)
-    
+
     # Verificar logs creados
     new_logs = ApiCallLog.objects.filter(service__service_type="NUBEFACT").order_by(
         "-created_at"
     )
     logs_count = new_logs.count()
     print(f"\n📊 Logs después de la llamada: {logs_count}")
-    
+
     if logs_count > initial_log_count:
         latest_log = new_logs.first()
         print("✅ Log registrado correctamente!")
@@ -181,14 +181,12 @@ try:
         print(
             "⚠️  No se encontraron nuevos logs. Verifica que el modelo ApiCallLog exista."
         )
-        
-     # Mostrar respuesta directa
+
+    # Mostrar respuesta directa
     print(f"\n📨 Respuesta directa de Nubefact:")
     print(f"   Enlace: {respuesta.get('enlace', 'No disponible')}")
-    print(
-        f"   Estado SUNAT: {respuesta.get('aceptada_por_sunat', 'No especificado')}"
-    )
-    
+    print(f"   Estado SUNAT: {respuesta.get('aceptada_por_sunat', 'No especificado')}")
+
     # Generar PDF
     generator = InvoicePDFGenerator(test_data)
     pdf_bytes = generator.generate_sync()
@@ -196,9 +194,11 @@ try:
     print(f"✅ PDF generated successfully")
     print(f"   Size: {len(pdf_bytes)} bytes")
 
-    # Guardar para verificar    
+    # Guardar para verificar
     filename = f"{test_data.get('serie', 'N/A')}{test_data.get('numero', 'N/A')}.pdf"
-    test_pdf_path = os.path.join(project_dir, f"myproject\\file_store\\billing\\invoices\\2026\\02\\{filename}")
+    test_pdf_path = os.path.join(
+        project_dir, f"myproject\\file_store\\billing\\invoices\\2026\\02\\{filename}"
+    )
     with open(test_pdf_path, "wb") as f:
         f.write(pdf_bytes)
 

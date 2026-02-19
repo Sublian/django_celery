@@ -22,35 +22,35 @@ from api_service.models import ApiCallLog
 REF_NUMBER = 91431
 # Tu JSON base (copiado de tu mensaje)
 JSON_BASE = {
-        "serie": "F001",
-        "numero": 91501,
-        "cliente_denominacion": "CLIENTE DE PRUEBA S.A.C.",
-        "cliente_numero_de_documento": "20123456789",
-        "cliente_direccion": "AV. PRUEBA 123, LIMA",
-        "fecha_de_emision": "2024-01-31",
-        "fecha_de_vencimiento": "2024-02-28",
-        "moneda": "1",
-        "total_gravada": 1000.0,
-        "porcentaje_igv": 18.0,
-        "total_igv": "180.00",
-        "total": "1180.00",
-        "observaciones": "Factura de prueba",
-        "condiciones_de_pago": "CONTADO",
-        "items": [
-            {
-                "unidad_de_medida": "ZZ",
-                "codigo": "TEST001",
-                "descripcion": "SERVICIO DE PRUEBA",
-                "cantidad": 1.0,
-                "valor_unitario": 1000.0,
-                "precio_unitario": 1180.0,
-                "subtotal": 1000.0,
-                "igv": 180.0,
-                "total": 1180.0,
-                "codigo_producto_sunat": "81112101",
-            }
-        ],
-    }
+    "serie": "F001",
+    "numero": 91501,
+    "cliente_denominacion": "CLIENTE DE PRUEBA S.A.C.",
+    "cliente_numero_de_documento": "20123456789",
+    "cliente_direccion": "AV. PRUEBA 123, LIMA",
+    "fecha_de_emision": "2024-01-31",
+    "fecha_de_vencimiento": "2024-02-28",
+    "moneda": "1",
+    "total_gravada": 1000.0,
+    "porcentaje_igv": 18.0,
+    "total_igv": "180.00",
+    "total": "1180.00",
+    "observaciones": "Factura de prueba",
+    "condiciones_de_pago": "CONTADO",
+    "items": [
+        {
+            "unidad_de_medida": "ZZ",
+            "codigo": "TEST001",
+            "descripcion": "SERVICIO DE PRUEBA",
+            "cantidad": 1.0,
+            "valor_unitario": 1000.0,
+            "precio_unitario": 1180.0,
+            "subtotal": 1000.0,
+            "igv": 180.0,
+            "total": 1180.0,
+            "codigo_producto_sunat": "81112101",
+        }
+    ],
+}
 
 
 def test_nubefact_with_logging():
