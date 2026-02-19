@@ -3,14 +3,13 @@ from django.shortcuts import render, redirect
 from django.core.paginator import Paginator
 from django.conf import settings
 from django.db.models import Q
-from django.db import transaction
 from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest
 from django.utils import timezone
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django import forms
 from .models import FileProcess, TaskRecord, PendingTask
-from .tasks import process_csv_file
+from core.services.task_dispatcher import TaskDispatcher
 from .utils.celery_status import is_redis_available, is_celery_available
 import os, logging
 
@@ -65,19 +64,23 @@ def upload_file(request):
         redis_ok = is_redis_available()
         celery_ok = is_celery_available()
 
+        
+
         if redis_ok and celery_ok:
-            def enqueue_task():
-                process_csv_file.apply_async(args=[obj.id])
-                logger.info(
-                    f"✅ Celery activo, tarea encolada para archivo '{name}' (ID {obj.id})"
-                )
-            transaction.on_commit(enqueue_task)
+            TaskDispatcher.dispatch(
+                "process_csv_file",
+                file_id=obj.id
+            )
+            logger.info(
+                f"✅ Celery activo, tarea encolada para archivo '{name}' (ID {obj.id})"
+            )
         else:
+            PendingTask.objects.create(
+                task_name="process_csv_file",
+                args={"file_id": obj.id}
+            )
             logger.warning(
                 f"⚠️ Celery/Redis inactivos. Guardando tarea pendiente para '{name}'"
-            )
-            PendingTask.objects.create(
-                task_name="core.tasks.process_csv_file", args={"file_id": obj.id}
             )
 
         # 🧠 Respuesta AJAX o normal
@@ -183,14 +186,14 @@ def pending_tasks_monitor(request):
 
 
 # 🔧 1️⃣ Definimos el despachador global de tareas
-TASK_DISPATCHER = {
-    "core.tasks.process_csv_file": lambda args: process_csv_file.delay(
-        args.get("file_id")
-    ),
-    # Ejemplo de futuras tareas:
-    # 'core.tasks.generar_reporte': lambda args: generar_reporte.delay(args.get('reporte_id')),
-    # 'core.tasks.enviar_notificacion': lambda args: enviar_notificacion.delay(args.get('user_id')),
-}
+# TASK_DISPATCHER = {
+#     "core.tasks.process_csv_file": lambda args: process_csv_file.delay(
+#         args.get("file_id")
+#     ),
+#     # Ejemplo de futuras tareas:
+#     # 'core.tasks.generar_reporte': lambda args: generar_reporte.delay(args.get('reporte_id')),
+#     # 'core.tasks.enviar_notificacion': lambda args: enviar_notificacion.delay(args.get('user_id')),
+# }
 
 
 @require_POST
@@ -216,25 +219,24 @@ def reprocesar_pendientes(request):
         # Extraemos el nombre de la tarea y los argumentos
         task_name = p.task_name
         args = p.args or {}
+        
+        # 2️⃣ Buscamos si la tarea está en el despachador
         try:
-            # 2️⃣ Buscamos si la tarea está en el despachador
-            if task_name in TASK_DISPATCHER:
-                TASK_DISPATCHER[task_name](args)
-                p.delete()
-                reencoladas += 1
-                logger.info(
-                    f"Tarea pendiente '{task_name}' reencolada correctamente (args={args})"
-                )
-            else:
-                no_reconocidas += 1
-                logger.warning(
-                    f"Tarea '{task_name}' no reconocida o no registrada en el despachador."
-                )
+            TaskDispatcher.dispatch(task_name, **args)
+            p.delete()
+            reencoladas += 1
+            logger.info(
+                f"Tarea pendiente '{task_name}' reencolada correctamente (args={args})"
+            )
+        except ValueError:
+            no_reconocidas += 1
+            logger.warning(
+                f"Tarea '{task_name}' no registrada en el dispatcher."
+            )
         except Exception as e:
             logger.error(
                 f"Error reintentando tarea pendiente '{task_name}' (ID={p.id}): {e}"
             )
-
     # 3️⃣ Feedback visual al usuario
 
     if reencoladas:
