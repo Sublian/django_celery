@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect
 from django.core.paginator import Paginator
 from django.conf import settings
 from django.db.models import Q
+from django.db import transaction
 from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest
 from django.utils import timezone
 from django.shortcuts import render, redirect
@@ -65,10 +66,12 @@ def upload_file(request):
         celery_ok = is_celery_available()
 
         if redis_ok and celery_ok:
-            process_csv_file.delay(obj.id)
-            logger.info(
-                f"✅ Celery activo, tarea encolada para archivo '{name}' (ID {obj.id})"
-            )
+            def enqueue_task():
+                process_csv_file.apply_async(args=[obj.id])
+                logger.info(
+                    f"✅ Celery activo, tarea encolada para archivo '{name}' (ID {obj.id})"
+                )
+            transaction.on_commit(enqueue_task)
         else:
             logger.warning(
                 f"⚠️ Celery/Redis inactivos. Guardando tarea pendiente para '{name}'"

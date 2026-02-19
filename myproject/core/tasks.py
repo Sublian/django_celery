@@ -107,55 +107,75 @@ TASK_DISPATCHER = {
 }
 
 
+# @shared_task
+# def reprocess_pending_tasks():
+#     """
+#     Reprocesa automáticamente las tareas pendientes guardadas cuando Celery o Redis estaban inactivos.
+#     Se ejecuta cada 5 minutos.
+#     """
+#     redis_ok = is_redis_available()
+#     # celery_ok = is_celery_available()
+#     celery_ok = redis_ok
+#     logger.info(
+#         f"🔁 [AutoReprocess] Redis: {redis_ok}, Celery: {celery_ok} (modo interno Celery)"
+#     )
+#     if not (celery_ok and redis_ok):
+#         logger.warning(f"⚠️ Celery o Redis aún no disponibles. Reintentará más tarde.")
+#         return "Celery/Redis no disponibles"
+
+#     pending = PendingTask.objects.all().order_by("-created_at")
+#     total = pending.count()
+
+#     if total == 0:
+#         logger.info("✅ No hay tareas pendientes por reprocesar.")
+#         return "Sin pendientes"
+
+#     logger.info(f"♻️ Detectadas {total} tarea(s) pendientes para reprocesar.")
+
+#     reprocesadas = 0
+#     no_reconocidas = 0
+
+#     for task in pending:
+#         task_name = task.task_name
+#         args = task.args or {}
+
+#         try:
+#             # Despachador dinámico
+#             if task_name in TASK_DISPATCHER:
+#                 TASK_DISPATCHER[task_name](args)
+#                 # task.processed = True
+#                 # task.processed_at = timezone.now()
+#                 task.delete()
+#                 reprocesadas += 1
+#                 logger.info(f"✅ Reprocesada tarea {task.id}: {task_name} ({args})")
+#             else:
+#                 no_reconocidas += 1
+#                 logger.warning(
+#                     f"⚠️ Tarea '{task_name}' no está registrada en el despachador."
+#                 )
+#         except Exception as e:
+#             logger.error(f"❌ Error reprocesando tarea {task.id}: {e}", exc_info=True)
+
+#     logger.info(f"🔁 Reprocesadas: {reprocesadas}, No reconocidas: {no_reconocidas}")
+
+#     return f"{reprocesadas} tareas reprocesadas, {no_reconocidas} no reconocidas."
+
 @shared_task
-def reprocess_pending_tasks():
-    """
-    Reprocesa automáticamente las tareas pendientes guardadas cuando Celery o Redis estaban inactivos.
-    Se ejecuta cada 5 minutos.
-    """
-    redis_ok = is_redis_available()
-    # celery_ok = is_celery_available()
-    celery_ok = redis_ok
-    logger.info(
-        f"🔁 [AutoReprocess] Redis: {redis_ok}, Celery: {celery_ok} (modo interno Celery)"
-    )
-    if not (celery_ok and redis_ok):
-        logger.warning(f"⚠️ Celery o Redis aún no disponibles. Reintentará más tarde.")
-        return "Celery/Redis no disponibles"
-
-    pending = PendingTask.objects.all().order_by("-created_at")
-    total = pending.count()
-
-    if total == 0:
-        logger.info("✅ No hay tareas pendientes por reprocesar.")
-        return "Sin pendientes"
-
-    logger.info(f"♻️ Detectadas {total} tarea(s) pendientes para reprocesar.")
-
+def reprocess_pending_tasks(batch_size=50):
+    pending_qs = PendingTask.objects.filter(processed=False).order_by('created_at')
     reprocesadas = 0
-    no_reconocidas = 0
-
-    for task in pending:
-        task_name = task.task_name
-        args = task.args or {}
-
-        try:
-            # Despachador dinámico
-            if task_name in TASK_DISPATCHER:
-                TASK_DISPATCHER[task_name](args)
-                # task.processed = True
-                # task.processed_at = timezone.now()
-                task.delete()
-                reprocesadas += 1
-                logger.info(f"✅ Reprocesada tarea {task.id}: {task_name} ({args})")
-            else:
-                no_reconocidas += 1
-                logger.warning(
-                    f"⚠️ Tarea '{task_name}' no está registrada en el despachador."
-                )
-        except Exception as e:
-            logger.error(f"❌ Error reprocesando tarea {task.id}: {e}", exc_info=True)
-
-    logger.info(f"🔁 Reprocesadas: {reprocesadas}, No reconocidas: {no_reconocidas}")
-
-    return f"{reprocesadas} tareas reprocesadas, {no_reconocidas} no reconocidas."
+    with transaction.atomic():
+        to_process = list(pending_qs.select_for_update(skip_locked=True)[:batch_size])
+        for task in to_process:
+            try:
+                if task.task_name in TASK_DISPATCHER:
+                    TASK_DISPATCHER[task.task_name](task.args or {})
+                    task.delete()
+                    reprocesadas += 1
+                else:
+                    task.attempts = F('attempts') + 1
+                    task.save()
+            except Exception as e:
+                task.attempts = F('attempts') + 1
+                task.save()
+    return f"{reprocesadas} reprocesadas"
