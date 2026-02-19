@@ -10,10 +10,7 @@ def test_dispatcher_executes_after_commit():
     with patch("core.tasks.process_csv_file.apply_async") as mock_apply:
 
         with transaction.atomic():
-            TaskDispatcher.dispatch(
-                "process_csv_file",
-                file_id=123
-            )
+            TaskDispatcher.dispatch("process_csv_file", file_id=123)
 
             # No debe ejecutarse aún
             assert not mock_apply.called

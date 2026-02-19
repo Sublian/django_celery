@@ -17,8 +17,6 @@ def create_file_process_and_enqueue(*, name, file, user=None):
     )
 
     # Encolar solo después del commit
-    transaction.on_commit(
-        lambda: process_csv_file.apply_async(args=[file_process.id])
-    )
+    transaction.on_commit(lambda: process_csv_file.apply_async(args=[file_process.id]))
 
     return file_process
