@@ -116,7 +116,7 @@ class NubefactServiceAsync(ABC):
     async def _ensure_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
-                timeout=self.timeout, headers=self._build_headers()
+                timeout=self.timeout_config, headers=self._build_headers()
             )
         return self._client
 
@@ -426,23 +426,23 @@ class NubefactServiceAsync(ABC):
                 return
 
             # 3. Preparar datos para guardar (limitar tamaño)
-            request_json = None
-            if request_data:
-                try:
-                    request_json = json.dumps(request_data, ensure_ascii=False)[:10000]
-                except:
-                    request_json = json.dumps({"error": "Could not serialize request"})
+            # request_json = None
+            # if request_data:
+            #     try:
+            #         request_json = json.dumps(request_data, ensure_ascii=False)[:10000]
+            #     except:
+            #         request_json = json.dumps({"error": "Could not serialize request"})
 
-            response_json = None
-            if response_data:
-                try:
-                    response_json = json.dumps(response_data, ensure_ascii=False)[
-                        :10000
-                    ]
-                except:
-                    response_json = json.dumps(
-                        {"error": "Could not serialize response"}
-                    )
+            # response_json = None
+            # if response_data:
+            #     try:
+            #         response_json = json.dumps(response_data, ensure_ascii=False)[
+            #             :10000
+            #         ]
+            #     except:
+            #         response_json = json.dumps(
+            #             {"error": "Could not serialize response"}
+            #         )
 
             # 4. Determinar estado
             is_success = 200 <= status_code < 300 if status_code else False
@@ -453,8 +453,8 @@ class NubefactServiceAsync(ABC):
                 endpoint=endpoint,
                 response_code=status_code,
                 duration_ms=duration_ms,
-                request_data=request_json,
-                response_data=response_json,
+                request_data=request_data,
+                response_data=response_data,
                 called_from=called_from,
                 status="SUCCESS" if is_success else "FAILED",
                 error_message=(
