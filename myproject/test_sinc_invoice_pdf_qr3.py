@@ -133,21 +133,22 @@ class InvoiceTestRunner:
             import time
 
             time.sleep(1)
-            response = self.simulate_nubefact_response(invoice_data)
-        else:
-            if self.nubefact_service is None:
-                self.nubefact_service = NubefactServiceAsync()
+            return self.simulate_nubefact_response(invoice_data)
+        
+            
+        async def _init_and_call():
+            service = NubefactServiceAsync()
+            await service._async_init()  # Inicializar explícitamente
+            return await service.generar_comprobante(invoice_data)
 
-            try:
-                response = async_to_sync(self.nubefact_service.generar_comprobante)(
-                    invoice_data
-                )
-            except Exception as e:
-                # ✅ El error ya debería estar logueado por nubefact_service_async.py
-                self.log(
-                    f"❌ Error en comunicación con NubeFact: {str(e)}", "error", "❌"
-                )
-                raise
+        try:
+            response =  async_to_sync(_init_and_call)()
+        except Exception as e:
+            # ✅ El error ya debería estar logueado por nubefact_service_async.py
+            self.log(
+                f"❌ Error en comunicación con NubeFact: {str(e)}", "error", "❌"
+            )
+            raise
 
         # Verificar error en respuesta
         is_error, error_msg = self.has_error_response(response)

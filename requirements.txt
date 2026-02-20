@@ -58,6 +58,7 @@ propcache==0.4.1
 psycopg2-binary==2.9.11
 pycairo==1.29.0
 pycparser==3.0
+pydantic>=2.0.0
 pydyf==0.12.1
 pygments==2.19.2
 pyhanko==0.32.0

@@ -14,7 +14,7 @@ async def test_minimal():
             "operacion": "generar_comprobante",
             "tipo_de_comprobante": "1",
             "serie": "F001",
-            "numero": 91516,
+            "numero": 91500,
             "sunat_transaction": "1",
             "cliente_tipo_de_documento": "6",
             "cliente_numero_de_documento": "20343443961",  # RUC válido
