@@ -12,6 +12,7 @@ from api_service.models import ApiCallLog, ApiService, ApiEndpoint, ApiBatchRequ
 
 logger = logging.getLogger(__name__)
 
+# api_service/services/nubefact/logging.py
 
 async def save_api_log_async(
     endpoint_name: str,
@@ -21,22 +22,53 @@ async def save_api_log_async(
     response_data: Optional[Dict] = None,
     called_from: str = "unknown",
     batch_request: ApiBatchRequest = None,
+    config=None,
 ) -> None:
     """
     Guarda un log de API de manera asíncrona.
     """
+    print(f"🔍 DEBUG - [logging] Iniciando para {endpoint_name}")
+    
+    # Variables para service y endpoint
+    service = None
+    endpoint = None
+    
     try:
-        service = await sync_to_async(ApiService.objects.get)(name="NUBEFACT Perú")
-        endpoint = await sync_to_async(ApiEndpoint.objects.get)(
-            service=service, name=endpoint_name
-        )
-
+        # 1. Obtener servicio (prioridad: config -> BD)
+        if config and config.service:
+            service = config.service
+            # ✅ Imprimir solo el ID, no toda la representación
+            print(f"🔍 DEBUG - [logging] Usando service desde config: ID={service.id}")
+        else:
+            print(f"🔍 DEBUG - [logging] Buscando servicio en BD...")
+            service = await sync_to_async(ApiService.objects.get)(name="NUBEFACT Perú")
+            print(f"🔍 DEBUG - [logging] Service encontrado en BD: ID={service.id}")
+        
+        # 2. Obtener endpoint (prioridad: config -> BD)
+        if config:
+            endpoint = config.get_endpoint(endpoint_name)
+            if endpoint:
+                # ✅ Imprimir solo ID y path, no acceder a relaciones
+                print(f"🔍 DEBUG - [logging] Endpoint desde config: ID={endpoint.id}, path={endpoint.path}")
+        
+        if not endpoint:
+            print(f"🔍 DEBUG - [logging] Buscando endpoint en BD...")
+            endpoint = await sync_to_async(ApiEndpoint.objects.get)(
+                service=service, name=endpoint_name
+            )
+            print(f"🔍 DEBUG - [logging] Endpoint encontrado en BD: ID={endpoint.id}")
+        
+        # 3. Determinar estado
         is_success = 200 <= status_code < 300
         error_message = None
         if not is_success and response_data:
             error_message = response_data.get("error") or response_data.get("errors")
 
-        await sync_to_async(ApiCallLog.objects.create)(
+        print(f"🔍 DEBUG - [logging] error_message: {error_message}")
+        print(f"🔍 DEBUG - [logging] Creando log con status_code={status_code}, is_success={is_success}")
+        
+        # 4. Crear log con objetos reales
+        log_entry = await sync_to_async(ApiCallLog.objects.create)(
             service=service,
             endpoint=endpoint,
             response_code=status_code,
@@ -49,14 +81,21 @@ async def save_api_log_async(
             error_message=error_message,
             created_at=timezone.now(),
         )
-        logger.debug(f"Log guardado para {endpoint_name} - status: {status_code}")
+        print(f"✅ [logging] Log guardado con ID: {log_entry.id}")
+        
     except ApiService.DoesNotExist:
-        logger.error("Servicio NUBEFACT Perú no encontrado en BD")
+        print(f"❌ [logging] ERROR: Servicio 'NUBEFACT Perú' no encontrado en BD")
     except ApiEndpoint.DoesNotExist:
-        logger.error(f"Endpoint '{endpoint_name}' no encontrado en BD")
+        print(f"❌ [logging] ERROR: Endpoint '{endpoint_name}' no encontrado en BD")
+        if service:
+            endpoints = await sync_to_async(list)(
+                ApiEndpoint.objects.filter(service=service).values_list('name', flat=True)
+            )
+            print(f"🔍 DEBUG - [logging] Endpoints disponibles: {endpoints}")
     except Exception as e:
-        logger.error(f"Error guardando log: {e}", exc_info=True)
-
+        print(f"❌ [logging] ERROR inesperado: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 def save_api_log_sync(
     endpoint_name: str,

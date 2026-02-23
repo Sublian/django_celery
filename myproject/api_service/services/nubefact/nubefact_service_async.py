@@ -179,6 +179,8 @@ class NubefactServiceAsync(ABC):
     ) -> None:
         """Wrapper asincrónico para logging - VERSIÓN MEJORADA"""
         try:
+            print(f"🔍 DEBUG - [_log_api_call_async] Log enviado para {endpoint_name} - status_code: {status_code}")
+            print(f"🔍 DEBUG - [_log_api_call_async] Response data: {response_data}")
             # Ejecutar el logging en un thread separado
             await save_api_log_async(
                 endpoint_name=endpoint_name,
@@ -188,14 +190,13 @@ class NubefactServiceAsync(ABC):
                 response_data=response_data,
                 called_from=called_from or "unknown",
                 batch_request=batch_request,
+                config=self.config,
             )
-            print(f"🔍 DEBUG - Log enviado para {endpoint_name} - status_code: {status_code}")
-            print(f"🔍 DEBUG - Response data: {response_data}")
+
         except Exception as e:
             logger.error(f"Failed to log API call: {str(e)}", exc_info=True)
     
     # ===== REQUEST HANDLING =====
-    
     async def send_request(
         self,
         endpoint_name: str,
@@ -208,29 +209,32 @@ class NubefactServiceAsync(ABC):
         if not self._initialized:
             await self._async_init()
 
-        # Get endpoint via executor (sync operation)
-        loop = asyncio.get_event_loop()
-        endpoint = await loop.run_in_executor(
-            self._executor, self._get_endpoint_sync, endpoint_name
-        )
+        # ✅ Obtener endpoint desde config (AHORA siempre es objeto ApiEndpoint)
+        endpoint = self.config.get_endpoint(endpoint_name)
+        
+        # Fallback a búsqueda en BD si no está en config
         if not endpoint:
-            raise ValueError(f"Endpoint {endpoint_name} not configured")
+            loop = asyncio.get_event_loop()
+            endpoint = await loop.run_in_executor(
+                self._executor, self._get_endpoint_sync, endpoint_name
+            )
+            if not endpoint:
+                raise ValueError(f"Endpoint {endpoint_name} not configured")
 
-        # Check rate limit 
+        # Check rate limit
         allowed, wait_seconds = await self._check_rate_limit(endpoint_name)
         if not allowed:
             raise NubefactAPIError(f"Rate limit exceeded; wait {wait_seconds}s")
 
         # Use data as-is (validation done in operations)
-        validated_data = data 
+        validated_data = data
 
         client = await self._ensure_client()
-        headers = self._build_headers() 
+        headers = self._build_headers()
+        
+        # ✅ endpoint.path funciona porque endpoint es un objeto ApiEndpoint real
         url = f"{self.base_url.rstrip('/')}/{endpoint.path.lstrip('/')}"
 
-        # # Verificar que el cliente no tenga configuraciones extrañas
-        # if hasattr(client, 'headers'):
-        #     print(f"🔍 DEBUG - Headers del cliente: {client.headers}")
         start = time.time()
 
         # Determinar called_from una sola vez
@@ -242,26 +246,29 @@ class NubefactServiceAsync(ABC):
             called_from = self._get_caller_info()
 
         validated_data_copy = validated_data.copy() if validated_data else {}
-        
-        # print(f"🔍 DEBUG - validated_data: {json.dumps(validated_data, indent=2)}")
 
         try:
             # Realizar la petición HTTP
             if method.upper() == "POST":
                 resp = await client.post(url, json=validated_data, headers=headers)
-                print("🔍")
             else:
                 resp = await client.request(method.upper(), url, json=validated_data, headers=headers)
 
             duration_ms = int((time.time() - start) * 1000)
-            print(f"🔍 DEBUG - Response data: {json.dumps(resp.json(), indent=2)}")
 
-            # Procesar respuesta (puede lanzar excepción si hay error de validación)
+            # Capturar respuesta para debug
+            try:
+                response_data = resp.json()
+            except:
+                response_data = {"error": "Respuesta no JSON"}
+
+            print(f"🔍 DEBUG - Status code: {resp.status_code}")
+            print(f"🔍 DEBUG - Response data: {json.dumps(response_data, indent=2)}")
+
+            # Procesar respuesta (puede lanzar excepción si hay error)
             result = self._handle_response_simple(resp)
-            
-            print(f"🔍 DEBUG - Response data: {json.dumps(result, indent=2)}")
-            
-            # ✅ LOG EXITOSO  y actualizar rate limit (siempre en background)
+
+            # ✅ LOG EXITOSO
             asyncio.create_task(self._update_rate_limit(endpoint_name))
             asyncio.create_task(
                 self._log_api_call_async(
@@ -271,10 +278,10 @@ class NubefactServiceAsync(ABC):
                     request_data=validated_data_copy,
                     response_data=result,
                     called_from=called_from,
+                    batch_request=batch_request,  # ✅ Pasar batch_request
                 )
             )
 
-            
             return result
 
         except httpx.RequestError as exc:
@@ -290,15 +297,22 @@ class NubefactServiceAsync(ABC):
                     request_data=validated_data_copy,
                     response_data=error_response,
                     called_from=called_from,
+                    batch_request=batch_request,  # ✅ Pasar batch_request
                 )
             )
             raise NubefactAPIError(str(exc))
 
         except (NubefactValidationError, NubefactAPIError) as exc:
-            # Error de validación o API (ya tienen su propio logging interno?)
+            # Error de validación o API
             duration_ms = int((time.time() - start) * 1000)
             status_code = getattr(exc, "status_code", 400)
+            
+            # ✅ Obtener response_data completo desde la excepción
             response_data = getattr(exc, "response_data", {"error": str(exc)})
+
+            print(f"🔍 DEBUG - Excepción capturada: {exc}")
+            print(f"🔍 DEBUG - Response_data en excepción: {json.dumps(response_data, indent=2)}")
+            print(f"🔍 DEBUG - Enviando log para {endpoint_name}...")
 
             asyncio.create_task(
                 self._log_api_call_async(
@@ -308,6 +322,7 @@ class NubefactServiceAsync(ABC):
                     request_data=validated_data_copy,
                     response_data=response_data,
                     called_from=called_from,
+                    batch_request=batch_request,  # ✅ Pasar batch_request
                 )
             )
             raise
@@ -324,10 +339,10 @@ class NubefactServiceAsync(ABC):
                     request_data=validated_data_copy,
                     response_data={"error": str(exc), "type": "UnexpectedError"},
                     called_from=called_from,
+                    batch_request=batch_request,  # ✅ Pasar batch_request
                 )
             )
-            raise
-
+            raise        
 
     def _handle_response_simple(self, response: httpx.Response) -> dict:
         """Procesa respuesta (async-safe)."""
@@ -344,6 +359,12 @@ class NubefactServiceAsync(ABC):
         # Si es 200, asumir éxito
         if code == 200:
             return response_data
+        
+        # ✅ DEBUG AQUÍ - antes de lanzar excepción
+        if code != 200:
+            print(f"🔍 DEBUG - Error detectado en respuesta:")
+            print(f"🔍 DEBUG - Status code: {code}")
+            print(f"🔍 DEBUG - Response data: {json.dumps(response_data, indent=2)}")
 
         # Para otros códigos, preparar excepción con datos completos
         error_msg = f"HTTP {code}"
@@ -364,8 +385,6 @@ class NubefactServiceAsync(ABC):
         exc.status_code = code
         raise exc
 
-
-    
     #############
     # OPERATIONS
     #############

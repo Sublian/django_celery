@@ -4,11 +4,11 @@ Carga configuración desde BD y proporciona acceso a token, URL y timeouts.
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Dict
 from asgiref.sync import sync_to_async
 import httpx
 
-from api_service.models import ApiService
+from api_service.models import ApiService, ApiEndpoint
 from api_service.services.base.timeout_config import TimeoutConfig
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ class NubefactConfig:
         self.base_url = None
         self.auth_token = None
         self.timeout_config = timeout_config or TimeoutConfig.from_settings("NUBEFACT")
+        self.endpoints = {}
 
         if not _skip_load:
             self._load_sync()
@@ -36,6 +37,12 @@ class NubefactConfig:
             raw_token = getattr(self.service, 'auth_token', '')
             # Sanitizar token: eliminar espacios, saltos de línea y caracteres invisibles
             self.auth_token = raw_token.strip().replace('\n', '').replace('\r', '')
+            
+            self.endpoints = {}
+            endpoints_qs = ApiEndpoint.objects.filter(service=self.service)
+            for endpoint in endpoints_qs:
+                self.endpoints[endpoint.name] = endpoint
+                
             if not self.base_url:
                 raise ValueError("URL base no configurada para NUBEFACT Perú")
             if not self.auth_token:
@@ -46,6 +53,10 @@ class NubefactConfig:
             logger.error(f"Error cargando configuración: {e}")
             raise
 
+    def get_endpoint(self, name: str) -> Optional[ApiEndpoint]:
+        """Obtiene un endpoint por su nombre."""
+        return self.endpoints.get(name)
+
     async def load_async(self) -> None:
         """Carga asíncrona desde BD."""
         try:
@@ -53,6 +64,14 @@ class NubefactConfig:
             self.base_url = getattr(self.service, 'base_url', 'https://api.nubefact.com').rstrip('/')
             raw_token = getattr(self.service, 'auth_token', '')
             self.auth_token = raw_token.strip().replace('\n', '').replace('\r', '')
+            
+            endpoints_qs = await sync_to_async(
+                lambda: list(ApiEndpoint.objects.filter(service=self.service))
+            )()
+            self.endpoints = {}
+            for endpoint in endpoints_qs:
+                self.endpoints[endpoint.name] = endpoint 
+                
             if not self.base_url:
                 raise ValueError("URL base no configurada para NUBEFACT Perú")
             if not self.auth_token:
