@@ -1,4 +1,6 @@
 # tests/integration/nubefact_flow/test_step1_send.py
+# Como usar: al final colocar el numero de la factura en un valor como este
+#python -m tests.integration.nubefact_flow.test_step1_send 91515
 
 import os
 import sys

@@ -106,9 +106,21 @@ class NubefactTestBase:
         with open(filepath, "r", encoding="utf-8") as f:
             return json.load(f)
     
+    # @classmethod
+    # def get_async_service(cls, timeout_config: Optional[TimeoutConfig] = None) -> NubefactServiceAsync:
+    #     """Obtiene una instancia del servicio asíncrono."""
+    #     return NubefactServiceAsync(timeout_config=timeout_config)
+    
     @classmethod
-    def get_async_service(cls, timeout_config: Optional[TimeoutConfig] = None) -> NubefactServiceAsync:
-        """Obtiene una instancia del servicio asíncrono."""
+    def get_async_service(cls, timeout_config: Optional[TimeoutConfig] = None):
+        """Obtiene servicio con timeouts optimizados para estrés."""
+        if timeout_config is None:
+            # Timeouts más agresivos para pruebas de estrés
+            timeout_config = TimeoutConfig(
+                connect_timeout=5.0,   # Reducido de 10s
+                read_timeout=15.0,      # Reducido de 30s
+                max_retries=1           # Sin reintentos en estrés
+            )
         return NubefactServiceAsync(timeout_config=timeout_config)
     
     @classmethod

@@ -27,7 +27,7 @@ async def save_api_log_async(
     """
     Guarda un log de API de manera asíncrona.
     """
-    print(f"🔍 DEBUG - [logging] Iniciando para {endpoint_name}")
+    # print(f"🔍 DEBUG - [logging] Iniciando para {endpoint_name}")
     
     # Variables para service y endpoint
     service = None
@@ -38,25 +38,25 @@ async def save_api_log_async(
         if config and config.service:
             service = config.service
             # ✅ Imprimir solo el ID, no toda la representación
-            print(f"🔍 DEBUG - [logging] Usando service desde config: ID={service.id}")
+            # print(f"🔍 DEBUG - [logging] Usando service desde config: ID={service.id}")
         else:
-            print(f"🔍 DEBUG - [logging] Buscando servicio en BD...")
+            # print(f"🔍 DEBUG - [logging] Buscando servicio en BD...")
             service = await sync_to_async(ApiService.objects.get)(name="NUBEFACT Perú")
-            print(f"🔍 DEBUG - [logging] Service encontrado en BD: ID={service.id}")
+            # print(f"🔍 DEBUG - [logging] Service encontrado en BD: ID={service.id}")
         
         # 2. Obtener endpoint (prioridad: config -> BD)
         if config:
             endpoint = config.get_endpoint(endpoint_name)
-            if endpoint:
+            # if endpoint:
                 # ✅ Imprimir solo ID y path, no acceder a relaciones
-                print(f"🔍 DEBUG - [logging] Endpoint desde config: ID={endpoint.id}, path={endpoint.path}")
+                # print(f"🔍 DEBUG - [logging] Endpoint desde config: ID={endpoint.id}, path={endpoint.path}")
         
         if not endpoint:
-            print(f"🔍 DEBUG - [logging] Buscando endpoint en BD...")
+            # print(f"🔍 DEBUG - [logging] Buscando endpoint en BD...")
             endpoint = await sync_to_async(ApiEndpoint.objects.get)(
                 service=service, name=endpoint_name
             )
-            print(f"🔍 DEBUG - [logging] Endpoint encontrado en BD: ID={endpoint.id}")
+            # print(f"🔍 DEBUG - [logging] Endpoint encontrado en BD: ID={endpoint.id}")
         
         # 3. Determinar estado
         is_success = 200 <= status_code < 300
@@ -64,8 +64,8 @@ async def save_api_log_async(
         if not is_success and response_data:
             error_message = response_data.get("error") or response_data.get("errors")
 
-        print(f"🔍 DEBUG - [logging] error_message: {error_message}")
-        print(f"🔍 DEBUG - [logging] Creando log con status_code={status_code}, is_success={is_success}")
+        # print(f"🔍 DEBUG - [logging] error_message: {error_message}")
+        # print(f"🔍 DEBUG - [logging] Creando log con status_code={status_code}, is_success={is_success}")
         
         # 4. Crear log con objetos reales
         log_entry = await sync_to_async(ApiCallLog.objects.create)(

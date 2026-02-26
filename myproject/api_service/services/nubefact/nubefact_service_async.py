@@ -179,8 +179,8 @@ class NubefactServiceAsync(ABC):
     ) -> None:
         """Wrapper asincrónico para logging - VERSIÓN MEJORADA"""
         try:
-            print(f"🔍 DEBUG - [_log_api_call_async] Log enviado para {endpoint_name} - status_code: {status_code}")
-            print(f"🔍 DEBUG - [_log_api_call_async] Response data: {response_data}")
+            # print(f"🔍 DEBUG - [_log_api_call_async] Log enviado para {endpoint_name} - status_code: {status_code}")
+            # print(f"🔍 DEBUG - [_log_api_call_async] Response data: {response_data}")
             # Ejecutar el logging en un thread separado
             await save_api_log_async(
                 endpoint_name=endpoint_name,
@@ -262,8 +262,8 @@ class NubefactServiceAsync(ABC):
             except:
                 response_data = {"error": "Respuesta no JSON"}
 
-            print(f"🔍 DEBUG - Status code: {resp.status_code}")
-            print(f"🔍 DEBUG - Response data: {json.dumps(response_data, indent=2)}")
+            # print(f"🔍 DEBUG - Status code: {resp.status_code}")
+            # print(f"🔍 DEBUG - Response data: {json.dumps(response_data, indent=2)}")
 
             # Procesar respuesta (puede lanzar excepción si hay error)
             result = self._handle_response_simple(resp)
@@ -310,9 +310,9 @@ class NubefactServiceAsync(ABC):
             # ✅ Obtener response_data completo desde la excepción
             response_data = getattr(exc, "response_data", {"error": str(exc)})
 
-            print(f"🔍 DEBUG - Excepción capturada: {exc}")
-            print(f"🔍 DEBUG - Response_data en excepción: {json.dumps(response_data, indent=2)}")
-            print(f"🔍 DEBUG - Enviando log para {endpoint_name}...")
+            # print(f"🔍 DEBUG - Excepción capturada: {exc}")
+            # print(f"🔍 DEBUG - Response_data en excepción: {json.dumps(response_data, indent=2)}")
+            # print(f"🔍 DEBUG - Enviando log para {endpoint_name}...")
 
             asyncio.create_task(
                 self._log_api_call_async(
@@ -361,10 +361,10 @@ class NubefactServiceAsync(ABC):
             return response_data
         
         # ✅ DEBUG AQUÍ - antes de lanzar excepción
-        if code != 200:
-            print(f"🔍 DEBUG - Error detectado en respuesta:")
-            print(f"🔍 DEBUG - Status code: {code}")
-            print(f"🔍 DEBUG - Response data: {json.dumps(response_data, indent=2)}")
+        # if code != 200:
+        #     print(f"🔍 DEBUG - Error detectado en respuesta:")
+        #     print(f"🔍 DEBUG - Status code: {code}")
+            # print(f"🔍 DEBUG - Response data: {json.dumps(response_data, indent=2)}")
 
         # Para otros códigos, preparar excepción con datos completos
         error_msg = f"HTTP {code}"
