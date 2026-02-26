@@ -1,0 +1,419 @@
+{
+  "config": {
+    "start_numero": 91700,
+    "count": 50,
+    "concurrency": 15,
+    "verbose": false,
+    "check_logs": false
+  },
+  "summary": {
+    "total": 50,
+    "successful": 50,
+    "failed": 0,
+    "duplicate": 0,
+    "other_errors": 0,
+    "total_time_seconds": 11.459620714187622
+  },
+  "details": [
+    {
+      "numero": 91702,
+      "success": true,
+      "error": null,
+      "duration_ms": 1939,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91701,
+      "success": true,
+      "error": null,
+      "duration_ms": 2020,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91709,
+      "success": true,
+      "error": null,
+      "duration_ms": 2013,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91703,
+      "success": true,
+      "error": null,
+      "duration_ms": 2020,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91707,
+      "success": true,
+      "error": null,
+      "duration_ms": 2052,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91713,
+      "success": true,
+      "error": null,
+      "duration_ms": 2052,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91705,
+      "success": true,
+      "error": null,
+      "duration_ms": 2070,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91708,
+      "success": true,
+      "error": null,
+      "duration_ms": 2093,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91712,
+      "success": true,
+      "error": null,
+      "duration_ms": 2093,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91711,
+      "success": true,
+      "error": null,
+      "duration_ms": 2163,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91714,
+      "success": true,
+      "error": null,
+      "duration_ms": 2172,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91710,
+      "success": true,
+      "error": null,
+      "duration_ms": 2253,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91704,
+      "success": true,
+      "error": null,
+      "duration_ms": 2330,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91706,
+      "success": true,
+      "error": null,
+      "duration_ms": 2371,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91700,
+      "success": true,
+      "error": null,
+      "duration_ms": 2599,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91723,
+      "success": true,
+      "error": null,
+      "duration_ms": 1456,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91722,
+      "success": true,
+      "error": null,
+      "duration_ms": 1460,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91718,
+      "success": true,
+      "error": null,
+      "duration_ms": 1470,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91725,
+      "success": true,
+      "error": null,
+      "duration_ms": 1485,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91719,
+      "success": true,
+      "error": null,
+      "duration_ms": 1571,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91717,
+      "success": true,
+      "error": null,
+      "duration_ms": 1716,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91716,
+      "success": true,
+      "error": null,
+      "duration_ms": 1721,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91728,
+      "success": true,
+      "error": null,
+      "duration_ms": 1746,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91721,
+      "success": true,
+      "error": null,
+      "duration_ms": 1753,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91727,
+      "success": true,
+      "error": null,
+      "duration_ms": 1789,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91726,
+      "success": true,
+      "error": null,
+      "duration_ms": 1810,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91729,
+      "success": true,
+      "error": null,
+      "duration_ms": 2035,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91715,
+      "success": true,
+      "error": null,
+      "duration_ms": 2085,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91724,
+      "success": true,
+      "error": null,
+      "duration_ms": 2154,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91720,
+      "success": true,
+      "error": null,
+      "duration_ms": 4960,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91733,
+      "success": true,
+      "error": null,
+      "duration_ms": 1365,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91732,
+      "success": true,
+      "error": null,
+      "duration_ms": 1385,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91740,
+      "success": true,
+      "error": null,
+      "duration_ms": 1476,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91730,
+      "success": true,
+      "error": null,
+      "duration_ms": 1602,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91744,
+      "success": true,
+      "error": null,
+      "duration_ms": 1686,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91731,
+      "success": true,
+      "error": null,
+      "duration_ms": 1779,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91738,
+      "success": true,
+      "error": null,
+      "duration_ms": 1935,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91743,
+      "success": true,
+      "error": null,
+      "duration_ms": 1941,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91734,
+      "success": true,
+      "error": null,
+      "duration_ms": 1969,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91736,
+      "success": true,
+      "error": null,
+      "duration_ms": 1985,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91737,
+      "success": true,
+      "error": null,
+      "duration_ms": 2020,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91742,
+      "success": true,
+      "error": null,
+      "duration_ms": 2125,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91739,
+      "success": true,
+      "error": null,
+      "duration_ms": 2140,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91741,
+      "success": true,
+      "error": null,
+      "duration_ms": 2288,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91735,
+      "success": true,
+      "error": null,
+      "duration_ms": 2290,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91746,
+      "success": true,
+      "error": null,
+      "duration_ms": 1290,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91745,
+      "success": true,
+      "error": null,
+      "duration_ms": 1349,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91748,
+      "success": true,
+      "error": null,
+      "duration_ms": 1360,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91747,
+      "success": true,
+      "error": null,
+      "duration_ms": 1472,
+      "pdf_path": null,
+      "error_code": null
+    },
+    {
+      "numero": 91749,
+      "success": true,
+      "error": null,
+      "duration_ms": 1599,
+      "pdf_path": null,
+      "error_code": null
+    }
+  ]
+}

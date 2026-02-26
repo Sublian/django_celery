@@ -5,6 +5,15 @@ Servicio unificado para pruebas de NubeFact.
 Integra todas las funcionalidades probadas.
 """
 
+# # Modo desarrollo (deberías ver éxitos/fallidos)
+# python -m tests.integration.nubefact_flow.test_service --mode dev --count 10
+
+# # Modo producción (optimizado)
+# python -m tests.integration.nubefact_flow.test_service --mode prod --count 50 --concurrency 10
+
+# # Modo estrés con números nuevos
+# python -m tests.integration.nubefact_flow.test_service --mode stress --start 91700 --count 50 --concurrency 15
+
 import os
 import sys
 import django
