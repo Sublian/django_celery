@@ -3,14 +3,13 @@
 import os
 import sys
 import django
-from pathlib import Path
 
-# ✅ Configurar Django ANTES de cualquier importación de modelos
+# Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "myproject.settings")
 django.setup()
 
-# Ahora sí, importaciones que dependen de Django
 import json
+from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -45,7 +44,6 @@ class NubefactTestBase:
         if numero is None:
             numero = str(int(datetime.now().timestamp() % 100000))
         
-        # Datos según el esquema ComprobanteSchema (todos strings)
         data = {
             "operacion": "generar_comprobante",
             "tipo_de_comprobante": "1",
@@ -95,9 +93,16 @@ class NubefactTestBase:
     @classmethod
     def save_response(cls, response: Dict, filename: str, output_dir: Path) -> Path:
         """Guarda una respuesta en archivo JSON."""
+         # ✅ Asegurar que output_dir es Path y filename es string
+        if isinstance(output_dir, str):
+            output_dir = Path(output_dir)
+        
         filepath = output_dir / filename
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(response, f, indent=2, ensure_ascii=False)
+        
         return filepath
     
     @classmethod
@@ -106,21 +111,9 @@ class NubefactTestBase:
         with open(filepath, "r", encoding="utf-8") as f:
             return json.load(f)
     
-    # @classmethod
-    # def get_async_service(cls, timeout_config: Optional[TimeoutConfig] = None) -> NubefactServiceAsync:
-    #     """Obtiene una instancia del servicio asíncrono."""
-    #     return NubefactServiceAsync(timeout_config=timeout_config)
-    
     @classmethod
-    def get_async_service(cls, timeout_config: Optional[TimeoutConfig] = None):
-        """Obtiene servicio con timeouts optimizados para estrés."""
-        if timeout_config is None:
-            # Timeouts más agresivos para pruebas de estrés
-            timeout_config = TimeoutConfig(
-                connect_timeout=5.0,   # Reducido de 10s
-                read_timeout=15.0,      # Reducido de 30s
-                max_retries=1           # Sin reintentos en estrés
-            )
+    def get_async_service(cls, timeout_config: Optional[TimeoutConfig] = None) -> NubefactServiceAsync:
+        """Obtiene una instancia del servicio asíncrono."""
         return NubefactServiceAsync(timeout_config=timeout_config)
     
     @classmethod

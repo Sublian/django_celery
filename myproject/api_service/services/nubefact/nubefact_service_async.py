@@ -52,6 +52,14 @@ class NubefactServiceAsync(ABC):
         self._initialized = False
         self.config = None
         self.rate_limiter = RateLimitManager() 
+        
+         # Configuración de logging
+        self.logging_enabled = True
+        self.logging_verbose = False  # Para pruebas de estrés
+        
+    def set_logging_mode(self, verbose: bool = False):
+        """Controla el modo de logging (útil para pruebas de estrés)."""
+        self.logging_verbose = verbose
 
     async def _async_init(self):
         """
@@ -178,9 +186,11 @@ class NubefactServiceAsync(ABC):
         batch_request: ApiBatchRequest = None,
     ) -> None:
         """Wrapper asincrónico para logging - VERSIÓN MEJORADA"""
+        
+        if not self.logging_enabled:
+            return
+
         try:
-            # print(f"🔍 DEBUG - [_log_api_call_async] Log enviado para {endpoint_name} - status_code: {status_code}")
-            # print(f"🔍 DEBUG - [_log_api_call_async] Response data: {response_data}")
             # Ejecutar el logging en un thread separado
             await save_api_log_async(
                 endpoint_name=endpoint_name,
@@ -191,6 +201,7 @@ class NubefactServiceAsync(ABC):
                 called_from=called_from or "unknown",
                 batch_request=batch_request,
                 config=self.config,
+                verbose=self.logging_verbose,
             )
 
         except Exception as e:
