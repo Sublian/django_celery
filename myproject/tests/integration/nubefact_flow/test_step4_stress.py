@@ -176,6 +176,7 @@ class TestNubefactStress(NubefactTestBase):
         Ejecuta prueba de estrés con control de verbose.
         """
         self.verbose = verbose
+        max_requests_per_minute = 180 
         
         print("\n" + "="*70)
         print(f"🧪 TEST STEP 4: PRUEBA DE ESTRÉS - {count} FACTURAS")
@@ -186,6 +187,10 @@ class TestNubefactStress(NubefactTestBase):
         print(f"   Verbose: {'SÍ' if verbose else 'NO'}")
         print(f"   Inicio: {datetime.now().strftime('%H:%M:%S')}")
         
+        if concurrency * 60 > max_requests_per_minute:
+            print(
+                f"⚠️ Concurrencia {concurrency} podría exceder límite de {max_requests_per_minute} rpm"
+            )
         # Resetear resultados
         self.results = {
             "total": 0,

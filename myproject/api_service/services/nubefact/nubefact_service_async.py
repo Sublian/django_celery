@@ -165,7 +165,7 @@ class NubefactServiceAsync(ABC):
         return "unknown"
 
     # ===== RATE LIMITING (usando RateLimitManager) =====
-    async def _check_rate_limit(self, endpoint_name: str) -> Tuple[bool, float]:
+    async def _check_rate_limit(self, endpoint_name: str) -> Tuple[bool, float, int]:
         """Verifica rate limit usando el manager."""
         return await self.rate_limiter.check_rate_limit_async(endpoint_name)
     
@@ -233,9 +233,19 @@ class NubefactServiceAsync(ABC):
                 raise ValueError(f"Endpoint {endpoint_name} not configured")
 
         # Check rate limit
-        allowed, wait_seconds = await self._check_rate_limit(endpoint_name)
+        allowed, wait_seconds, current_limit  = await self._check_rate_limit(endpoint_name)
         if not allowed:
-            raise NubefactAPIError(f"Rate limit exceeded; wait {wait_seconds}s")
+            # Calcular cuánto esperar
+            logger.warning(f"⏳ Rate limit alcanzado para {endpoint_name}. Esperando {wait_seconds:.1f}s")
+            
+            if wait_seconds < 60:  # Esperar menos de 1 minuto
+                await asyncio.sleep(wait_seconds)
+                # Reintentar
+                allowed, wait_seconds, _ = await self._check_rate_limit(endpoint_name)
+                if not allowed:
+                    raise NubefactAPIError(f"Rate limit exceeded. Try again in {wait_seconds:.0f}s")
+            else:
+                raise NubefactAPIError(f"Rate limit exceeded. Try again in {wait_seconds:.0f}s")
 
         # Use data as-is (validation done in operations)
         validated_data = data
